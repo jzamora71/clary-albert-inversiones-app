@@ -14,7 +14,6 @@ Two things are saved permanently through db.py:
     app (homepage totals, Reporte, PDF export).
 """
 
-import traceback
 from datetime import date
 
 import pandas as pd
@@ -26,18 +25,7 @@ from utils import COMPANY_NAME, init_session_state, money
 st.set_page_config(page_title=f"Pagos de Alquiler - {COMPANY_NAME}", page_icon="🏠", layout="wide")
 
 init_session_state()
-
-try:
-    db.init_db()
-except Exception:
-    st.code(traceback.format_exc())
-    st.stop()
-
-try:
-    _debug_inquilinos = db.get_inquilinos()
-except Exception:
-    st.code(traceback.format_exc())
-    st.stop()
+db.init_db()
 
 st.page_link("app.py", label="🏠 Volver al inicio", icon=None)
 
