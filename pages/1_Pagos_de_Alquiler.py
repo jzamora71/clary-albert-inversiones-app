@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, init_session_state, money
+from utils import COMPANY_NAME, fecha_dmy, init_session_state, mes_key, mes_label, money
 
 st.set_page_config(page_title=f"Pagos de Alquiler - {COMPANY_NAME}", page_icon="🏠", layout="wide")
 
@@ -83,7 +83,7 @@ with col2:
 
 col3, col4 = st.columns(2)
 with col3:
-    fecha_pago = st.date_input("Fecha de pago", value=date.today(), key="pago_fecha")
+    fecha_pago = st.date_input("Fecha de pago (dia/mes/año)", value=date.today(), key="pago_fecha")
 with col4:
     monto_pago = st.number_input(
         "Monto pagado",
@@ -118,7 +118,19 @@ pagos = db.get_pagos_alquiler()
 if pagos:
     pagos_df = pd.DataFrame(pagos)[["apartamento", "nombre", "telefono", "fecha", "monto"]]
     pagos_df.columns = ["Apartamento", "Inquilino", "Telefono", "Fecha", "Monto"]
+
+    mes_actual = mes_key(date.today().isoformat())
+    total_mes_actual = pagos_df.loc[
+        pagos_df["Fecha"].apply(mes_key) == mes_actual, "Monto"
+    ].sum()
+    total_general_pagos = pagos_df["Monto"].sum()
+
+    c1, c2 = st.columns(2)
+    c1.metric(f"Total de {mes_label(mes_actual)}", money(total_mes_actual))
+    c2.metric("Total general de pagos", money(total_general_pagos))
+
     pagos_show = pagos_df.copy()
+    pagos_show["Fecha"] = pagos_show["Fecha"].apply(fecha_dmy)
     pagos_show["Monto"] = pagos_show["Monto"].apply(money)
     st.dataframe(pagos_show, use_container_width=True, hide_index=True)
 else:

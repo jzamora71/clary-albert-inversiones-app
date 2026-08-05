@@ -33,6 +33,14 @@ DB_PATH = Path(__file__).parent / "data.db"
 CONNECTION_NAME = "supabase_db"
 NUM_APARTAMENTOS = 13
 
+# Expense categories. "Pago del gerente" is tracked separately from other
+# expenses so the monthly/overall report can show exactly how much of the
+# rent income went to the manager vs. everything else, while both still
+# count as gastos and get subtracted from ingresos.
+TIPO_PAGO_GERENTE = "Pago del gerente"
+TIPO_OTRO_GASTO = "Otro gasto"
+TIPOS_GASTO = [TIPO_PAGO_GERENTE, TIPO_OTRO_GASTO]
+
 
 def _has_supabase_secret():
     try:
@@ -93,6 +101,7 @@ def init_db():
     with conn.session as s:
         _add_column_if_missing(s, "ingresos", "apartamento", "INTEGER")
         _add_column_if_missing(s, "ingresos", "telefono", "TEXT")
+        _add_column_if_missing(s, "gastos", "categoria", "TEXT")
 
     # Make sure all 13 apartments exist in the tenant directory so the
     # payment form always has something to show, even before any tenant
@@ -186,12 +195,12 @@ def add_ingreso(concepto, fecha, monto):
         s.commit()
 
 
-def add_gasto(concepto, fecha, monto):
+def add_gasto(concepto, fecha, monto, categoria=TIPO_OTRO_GASTO):
     conn = get_conn()
     with conn.session as s:
         s.execute(
-            text("INSERT INTO gastos (concepto, fecha, monto) VALUES (:c, :f, :m)"),
-            {"c": concepto, "f": fecha, "m": monto},
+            text("INSERT INTO gastos (concepto, fecha, monto, categoria) VALUES (:c, :f, :m, :cat)"),
+            {"c": concepto, "f": fecha, "m": monto, "cat": categoria or TIPO_OTRO_GASTO},
         )
         s.commit()
 
@@ -218,7 +227,10 @@ def get_pagos_alquiler():
 def get_gastos():
     conn = get_conn()
     df = conn.query(
-        "SELECT id, concepto, fecha, monto FROM gastos ORDER BY fecha, id", ttl=0
+        "SELECT id, concepto, fecha, monto, "
+        "COALESCE(categoria, 'Otro gasto') AS categoria "
+        "FROM gastos ORDER BY fecha DESC, id DESC",
+        ttl=0,
     )
     return df.to_dict("records")
 
@@ -267,10 +279,18 @@ def import_ingresos_df(df):
 
 def import_gastos_df(df):
     conn = get_conn()
+    cat_col = "Categoria" if "Categoria" in df.columns else ("Tipo" if "Tipo" in df.columns else None)
     with conn.session as s:
         for _, row in df.iterrows():
+            categoria = str(row[cat_col]).strip() if cat_col else ""
+            categoria = categoria if categoria in TIPOS_GASTO else TIPO_OTRO_GASTO
             s.execute(
-                text("INSERT INTO gastos (concepto, fecha, monto) VALUES (:c, :f, :m)"),
-                {"c": str(row["Concepto"]), "f": str(row["Fecha"]), "m": float(row["Monto"])},
+                text("INSERT INTO gastos (concepto, fecha, monto, categoria) VALUES (:c, :f, :m, :cat)"),
+                {
+                    "c": str(row["Concepto"]),
+                    "f": str(row["Fecha"]),
+                    "m": float(row["Monto"]),
+                    "cat": categoria,
+                },
             )
         s.commit()

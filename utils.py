@@ -6,6 +6,7 @@ formats money and builds PDFs the exact same way, and the session_state keys
 that hold the data are only ever created once.
 """
 
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 import streamlit as st
@@ -44,6 +45,38 @@ def fecha_es_larga(fecha):
     return f"{fecha.day} de {MESES_ES[fecha.month]} de {fecha.year}"
 
 
+def fecha_dmy(fecha_valor):
+    """Format a stored date (ISO string 'YYYY-MM-DD' or a date object) as
+    dia/mes/anio for display -- e.g. '2026-08-05' -> '05/08/2026'.
+
+    Every table and PDF in the app shows dates through this helper so the
+    stored value stays ISO (sorts correctly) while what the user sees is
+    always day/month/year.
+    """
+    if fecha_valor is None or str(fecha_valor).strip() == "":
+        return ""
+    texto = str(fecha_valor)[:10]
+    try:
+        d = datetime.strptime(texto, "%Y-%m-%d").date()
+    except ValueError:
+        return str(fecha_valor)
+    return f"{d.day:02d}/{d.month:02d}/{d.year}"
+
+
+def mes_key(fecha_valor):
+    """Return a sortable 'YYYY-MM' key for grouping entries by month."""
+    return str(fecha_valor)[:7]
+
+
+def mes_label(year_month_key):
+    """Turn a 'YYYY-MM' key into a Spanish label, e.g. '2026-08' -> 'agosto 2026'."""
+    try:
+        year_str, month_str = year_month_key.split("-")
+        return f"{MESES_ES[int(month_str)]} {year_str}"
+    except (ValueError, KeyError):
+        return year_month_key
+
+
 def money(x):
     value = Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return f"RD$ {value:,.2f}"
@@ -78,7 +111,16 @@ def sanitize_text(text):
     return text
 
 
-def build_pdf(empresa, fecha_reporte, ingresos_df, gastos_df, total_ingresos, total_gastos, neto):
+def build_pdf(
+    empresa,
+    fecha_reporte,
+    ingresos_df,
+    gastos_df,
+    total_ingresos,
+    total_gastos,
+    neto,
+    resumen_mensual_df=None,
+):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -118,7 +160,7 @@ def build_pdf(empresa, fecha_reporte, ingresos_df, gastos_df, total_ingresos, to
 
     pdf.set_font("Helvetica", "", 10)
     for _, row in ingresos_df.iterrows():
-        fecha_txt = str(row["Fecha"])
+        fecha_txt = fecha_dmy(row["Fecha"])
         monto_txt = money_pdf(row["Monto"])
         if has_apartamento:
             apto_txt = str(row["Apartamento"]) if str(row["Apartamento"]) != "nan" else ""
@@ -140,19 +182,57 @@ def build_pdf(empresa, fecha_reporte, ingresos_df, gastos_df, total_ingresos, to
     pdf.set_font("Helvetica", "B", 13)
     pdf.cell(0, 8, "Gastos", ln=True)
 
+    has_categoria = "Categoria" in gastos_df.columns
+
     pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(95, 8, "Concepto", border=1)
-    pdf.cell(40, 8, "Fecha", border=1)
-    pdf.cell(45, 8, "Monto", border=1, ln=True)
+    if has_categoria:
+        pdf.cell(35, 8, "Tipo", border=1)
+        pdf.cell(60, 8, "Concepto", border=1)
+        pdf.cell(35, 8, "Fecha", border=1)
+        pdf.cell(40, 8, "Monto", border=1, ln=True)
+    else:
+        pdf.cell(95, 8, "Concepto", border=1)
+        pdf.cell(40, 8, "Fecha", border=1)
+        pdf.cell(45, 8, "Monto", border=1, ln=True)
 
     pdf.set_font("Helvetica", "", 10)
     for _, row in gastos_df.iterrows():
-        concepto = sanitize_text(str(row["Concepto"]))[:45]
-        fecha_txt = str(row["Fecha"])
+        fecha_txt = fecha_dmy(row["Fecha"])
         monto_txt = money_pdf(row["Monto"])
-        pdf.cell(95, 8, concepto, border=1)
-        pdf.cell(40, 8, fecha_txt, border=1)
-        pdf.cell(45, 8, monto_txt, border=1, ln=True)
+        if has_categoria:
+            tipo_txt = sanitize_text(str(row["Categoria"]))[:20]
+            concepto = sanitize_text(str(row["Concepto"]))[:32]
+            pdf.cell(35, 8, tipo_txt, border=1)
+            pdf.cell(60, 8, concepto, border=1)
+            pdf.cell(35, 8, fecha_txt, border=1)
+            pdf.cell(40, 8, monto_txt, border=1, ln=True)
+        else:
+            concepto = sanitize_text(str(row["Concepto"]))[:45]
+            pdf.cell(95, 8, concepto, border=1)
+            pdf.cell(40, 8, fecha_txt, border=1)
+            pdf.cell(45, 8, monto_txt, border=1, ln=True)
+
+    if resumen_mensual_df is not None and not resumen_mensual_df.empty:
+        pdf.ln(6)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Resumen Mensual", ln=True)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(45, 8, "Mes", border=1)
+        pdf.cell(38, 8, "Alquiler", border=1)
+        pdf.cell(38, 8, "Gerente", border=1)
+        pdf.cell(38, 8, "Otros Gastos", border=1)
+        pdf.cell(31, 8, "Balance", border=1, ln=True)
+
+        pdf.set_font("Helvetica", "", 10)
+        for _, row in resumen_mensual_df.iterrows():
+            is_total = str(row["Mes"]).strip().lower().startswith("total")
+            pdf.set_font("Helvetica", "B" if is_total else "", 10)
+            pdf.cell(45, 8, sanitize_text(str(row["Mes"]))[:22], border=1)
+            pdf.cell(38, 8, money_pdf(row["Pagos de Alquiler"]), border=1)
+            pdf.cell(38, 8, money_pdf(row["Pago del Gerente"]), border=1)
+            pdf.cell(38, 8, money_pdf(row["Otros Gastos"]), border=1)
+            pdf.cell(31, 8, money_pdf(row["Balance del Mes"]), border=1, ln=True)
 
     pdf_bytes = pdf.output(dest="S")
     if isinstance(pdf_bytes, bytearray):

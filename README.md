@@ -43,6 +43,32 @@ two new columns, `apartamento` and `telefono`), so no existing data is
 lost and the rest of the app (Reporte totals, PDF, CSV backup/restore)
 keeps working without any extra setup.
 
+## Gastos: Pago del gerente vs. Otros gastos
+
+Every expense on the **Gastos** page is now tagged with a **Tipo de
+gasto**: either "Pago del gerente" (the building manager's payment) or
+"Otro gasto" (anything else -- repairs, maintenance, supplies, etc.).
+Both types are still expenses and both get subtracted from the rent
+income, but tracking them separately lets the Reporte page show exactly
+how much went to the manager vs. everything else each month.
+
+## Resumen mensual y gran total (Reporte)
+
+The Reporte page now includes a **Resumen mensual** table that groups
+every rent payment and expense by calendar month, showing for each
+month: total rent collected, the manager's payment, other expenses, and
+the balance left over. The last row, **Total general**, adds up every
+month into a single grand total -- i.e. all rent income minus the
+manager's pay and all other expenses, across the whole history of the
+app. This same table is also printed at the end of the downloadable PDF
+report.
+
+## Dates shown as dia/mes/año
+
+Every table and the PDF report display dates as **dia/mes/año**
+(e.g. `05/08/2026` for August 5th, 2026) no matter how they're stored
+internally, through the `fecha_dmy()` helper in `utils.py`.
+
 ## Why the report no longer opens automatically
 
 Before, all of the report code (forms, tables, PDF generation) lived
