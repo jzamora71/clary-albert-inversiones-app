@@ -11,6 +11,7 @@ opening this landing page.
 
 import streamlit as st
 
+import db
 from utils import COMPANY_NAME, init_session_state, money
 
 st.set_page_config(
@@ -22,11 +23,15 @@ st.set_page_config(
 
 # --- Session state check --------------------------------------------------
 # init_session_state() uses st.session_state.setdefault(...), so it only
-# creates the "ingresos" / "gastos" storage the FIRST time the app runs in
+# creates a couple of lightweight UI flags the FIRST time the app runs in
 # a session. On every later rerun (e.g. clicking a button) it does nothing,
 # so the landing page below is always what renders first -- reports never
 # auto-launch, they only open when a nav button is explicitly clicked.
+#
+# The actual Ingresos/Gastos data no longer lives in session_state -- it's
+# read from data.db (see db.py) so it survives app restarts.
 init_session_state()
+db.init_db()
 
 st.markdown(
     """
@@ -86,8 +91,8 @@ st.markdown(
 )
 
 # --- Quick summary (read-only preview, does not open any report) ----------
-total_ingresos = sum(item["Monto"] for item in st.session_state.ingresos)
-total_gastos = sum(item["Monto"] for item in st.session_state.gastos)
+total_ingresos = sum(item["monto"] for item in db.get_ingresos())
+total_gastos = sum(item["monto"] for item in db.get_gastos())
 neto = total_ingresos - total_gastos
 
 c1, c2, c3 = st.columns(3)

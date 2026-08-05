@@ -6,13 +6,15 @@
 clary_albert_app/
   app.py                 <- Homepage ONLY (logo, welcome message, nav buttons)
   utils.py                <- Shared helpers used by every page
+  db.py                    <- Permanent storage (SQLite) for Ingresos/Gastos
+  data.db                  <- The database file itself (created automatically, not in git)
   requirements.txt
   assets/
-    logo.png              <- Placeholder logo, replace with your real one
+    logo.png              <- Real logo
   pages/
     1_Ingresos.py          <- Income entry report
     2_Gastos.py             <- Expense entry report
-    3_Reporte.py            <- Summary + PDF export report
+    3_Reporte.py            <- Summary + PDF export + backup/restore report
 ```
 
 Streamlit automatically turns every file inside `/pages` into a sidebar
@@ -64,12 +66,30 @@ check" that keeps the landing page as the first thing you see.
 3. Replace the file at `clary_albert_app/assets/logo.png` with it.
 4. Refresh the browser tab (no code changes needed).
 
+## Permanent data storage (Ingresos / Gastos)
+
+Ingresos and Gastos are now saved to a small database file, `data.db`,
+using `db.py`. This means the numbers survive:
+
+- Navigating between Ingresos, Gastos, Reporte, and the homepage
+- Closing the app and reopening it later
+- The "this app has gone to sleep" wake-up screen on Streamlit Community
+  Cloud (waking it up resumes the same files)
+
+**Important limitation**: Streamlit Community Cloud's free tier does not
+guarantee `data.db` survives forever. If the app is redeployed with new
+code, or manually rebooted from the dashboard, the database file can be
+reset to empty. To protect against that, the Reporte page has a
+"Respaldo y restauracion de datos" section:
+
+- **Download a backup**: click "Descargar respaldo de Ingresos (CSV)" and
+  "Descargar respaldo de Gastos (CSV)" every so often (e.g. after adding
+  a batch of entries) and save those files somewhere safe.
+- **Restore from a backup**: if you ever open the app and the numbers are
+  unexpectedly empty, upload your most recent backup CSV in that same
+  section to bring the data back.
+
 ## Notes
 
-- Data entered in Ingresos/Gastos is stored in `st.session_state`, so it
-  stays available while you navigate between Ingresos, Gastos, Reporte,
-  and back to the homepage — but it resets if you fully stop and restart
-  `streamlit run app.py`. Saving data permanently (e.g. to a CSV or
-  database) is a separate step, not part of this restructuring.
 - If you ever add a new report, create a new file inside `/pages`
   (e.g. `pages/4_NuevoReporte.py`) instead of adding code to `app.py`.

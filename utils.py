@@ -37,8 +37,6 @@ def init_session_state():
     time, this never resets data the user already entered, and it never
     triggers any report logic by itself -- it only prepares empty storage.
     """
-    st.session_state.setdefault("ingresos", [])
-    st.session_state.setdefault("gastos", [])
     st.session_state.setdefault("app_initialized", True)
 
 
