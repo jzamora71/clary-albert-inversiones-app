@@ -123,3 +123,13 @@ st.caption(
     "Tambien puedes usar el menu de navegacion en la barra lateral izquierda "
     "para ir directamente a Ingresos, Gastos o Reporte."
 )
+
+# --- Storage status (helps confirm permanent storage is active) -----------
+if db.using_supabase():
+    st.caption("Almacenamiento permanente activo (Supabase). Tus datos no se perderan.")
+else:
+    st.caption(
+        "Almacenamiento temporal (modo de prueba local). Configura Supabase "
+        "en Streamlit Secrets para guardar los datos de forma permanente -- "
+        "ver README.md."
+    )

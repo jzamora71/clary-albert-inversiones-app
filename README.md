@@ -68,26 +68,65 @@ check" that keeps the landing page as the first thing you see.
 
 ## Permanent data storage (Ingresos / Gastos)
 
-Ingresos and Gastos are now saved to a small database file, `data.db`,
-using `db.py`. This means the numbers survive:
+Ingresos and Gastos are saved through `db.py`. There are two modes:
 
-- Navigating between Ingresos, Gastos, Reporte, and the homepage
-- Closing the app and reopening it later
-- The "this app has gone to sleep" wake-up screen on Streamlit Community
-  Cloud (waking it up resumes the same files)
+- **Local fallback (default, NOT permanent on Streamlit Cloud)** -- writes
+  to a local file `data.db`. Fine for testing on your own computer, but
+  Streamlit Community Cloud's free tier does not guarantee this file
+  survives an app restart, reboot, or redeploy -- it can silently reset to
+  empty.
+- **Supabase (permanent, recommended for the live app)** -- writes to a
+  free hosted Postgres database that lives outside of Streamlit entirely,
+  so your data survives no matter what happens to the app container.
 
-**Important limitation**: Streamlit Community Cloud's free tier does not
-guarantee `data.db` survives forever. If the app is redeployed with new
-code, or manually rebooted from the dashboard, the database file can be
-reset to empty. To protect against that, the Reporte page has a
-"Respaldo y restauracion de datos" section:
+The app automatically uses Supabase once it's configured, and otherwise
+quietly falls back to the local file. The homepage shows a small caption
+telling you which mode is currently active.
+
+### One-time Supabase setup (do this once for the live app)
+
+1. Go to [supabase.com](https://supabase.com) and sign up for a free
+   account (you can sign up with your GitHub account -- the same
+   `jzamora71` account already used for this project).
+2. Click **New project**. Give it any name (e.g. `clary-albert-inversiones`),
+   choose any region close to you, and set a database password -- write
+   this password down somewhere safe, you'll need it in the next step.
+3. Wait about 1-2 minutes for the project to finish setting up.
+4. In the left sidebar, click the **Connect** button (or go to
+   **Project Settings > Database**). Look for the **Connection string**
+   section and copy the **URI** under "Session pooler" (recommended for
+   Streamlit Cloud). It looks like:
+   `postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:5432/postgres`
+5. Replace `[YOUR-PASSWORD]` in that string with the real database
+   password you set in step 2.
+6. Go to your app on [share.streamlit.io](https://share.streamlit.io),
+   click the **⋮** menu next to your app, then **Settings > Secrets**.
+7. Paste the following into the Secrets box, using your real connection
+   string from step 5:
+
+   ```toml
+   [connections.supabase_db]
+   url = "postgresql://postgres.xxxxx:YOUR-PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres"
+   ```
+8. Click **Save**. The app will automatically restart and reconnect --
+   the homepage caption should switch to "Almacenamiento permanente
+   activo (Supabase)".
+
+**Never commit the real connection string to GitHub** -- it only goes
+into Streamlit's Secrets box, which is private and separate from the
+code repository.
+
+### Backup and restore (safety net either way)
+
+The Reporte page always has a "Respaldo y restauracion de datos" section,
+regardless of which storage mode is active:
 
 - **Download a backup**: click "Descargar respaldo de Ingresos (CSV)" and
-  "Descargar respaldo de Gastos (CSV)" every so often (e.g. after adding
-  a batch of entries) and save those files somewhere safe.
-- **Restore from a backup**: if you ever open the app and the numbers are
-  unexpectedly empty, upload your most recent backup CSV in that same
-  section to bring the data back.
+  "Descargar respaldo de Gastos (CSV)" every so often and save those
+  files somewhere safe.
+- **Restore from a backup**: if the numbers are ever unexpectedly empty,
+  upload your most recent backup CSV in that same section to bring the
+  data back.
 
 ## Notes
 
