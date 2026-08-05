@@ -62,6 +62,10 @@ if st.button("Agregar gasto", type="primary"):
     else:
         db.add_gasto(gasto_concepto.strip(), gasto_fecha.isoformat(), float(gasto_monto), categoria=db.TIPO_OTRO_GASTO)
         st.success("Gasto registrado y guardado.")
+        # Limpiar la descripcion y el monto para que el siguiente gasto
+        # empiece en blanco, en vez de mostrar los datos del anterior.
+        del st.session_state["gasto_concepto"]
+        del st.session_state["gasto_monto"]
         st.rerun()
 
 st.divider()

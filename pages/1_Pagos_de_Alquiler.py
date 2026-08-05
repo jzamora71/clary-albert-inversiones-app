@@ -90,7 +90,7 @@ with col4:
         min_value=0.0,
         step=100.0,
         format="%.2f",
-        key="pago_monto",
+        key=f"pago_monto_{apartamento}",
     )
 
 if st.button("Registrar pago", type="primary"):
@@ -107,6 +107,9 @@ if st.button("Registrar pago", type="primary"):
             monto=float(monto_pago),
         )
         st.success(f"Pago del apartamento {apartamento} registrado y guardado.")
+        # Limpiar el monto para que el siguiente pago (mismo apartamento u
+        # otro) siempre empiece en blanco/0, en vez de mostrar este monto.
+        del st.session_state[f"pago_monto_{apartamento}"]
         st.rerun()
 
 st.divider()

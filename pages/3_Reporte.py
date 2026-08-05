@@ -137,14 +137,75 @@ total_otros_gastos = resumen_mensual_df["Otros Gastos"].sum() if not resumen_men
 total_gastos = total_gerente + total_otros_gastos
 neto = total_ingresos - total_gastos
 
+# --- Selector de mes a mostrar ----------------------------------------------
+# Por defecto el reporte muestra solo el mes actual (totales y detalles de
+# abajo). El cuadro "Resumen mensual" mas abajo es la unica seccion que
+# siempre muestra todos los meses juntos, para quien quiera verlos todos.
+mes_actual_key = mes_key(date.today().isoformat())
+meses_vista_opciones = sorted(
+    set(meses) | set(rango_meses(atras=12, adelante=2)) | {mes_actual_key}, reverse=True
+)
+opciones_selector_vista = ["TODOS"] + meses_vista_opciones
+indice_default_vista = (
+    opciones_selector_vista.index(mes_actual_key) if mes_actual_key in opciones_selector_vista else 0
+)
+
+mes_vista = st.selectbox(
+    "Mes a mostrar",
+    options=opciones_selector_vista,
+    index=indice_default_vista,
+    format_func=lambda clave: "Todos los meses" if clave == "TODOS" else mes_label(clave),
+    key="reporte_mes_vista",
+)
+st.caption(
+    "Los totales y las tablas de Pagos de Alquiler / Gastos de abajo muestran "
+    "solo el mes seleccionado. El cuadro 'Resumen mensual' mas abajo siempre "
+    "muestra todos los meses juntos, sin importar lo que elijas aqui."
+)
+
+ver_todos_los_meses = mes_vista == "TODOS"
+
+if ver_todos_los_meses:
+    ingresos_vista_df = ingresos_df
+    gastos_vista_df = gastos_df
+    total_ingresos_vista = total_ingresos
+    total_gerente_vista = total_gerente
+    total_otros_vista = total_otros_gastos
+    total_gastos_vista = total_gastos
+    neto_vista = neto
+    titulo_vista = "Todos los meses"
+else:
+    ingresos_vista_df = (
+        ingresos_df[ingresos_df["Fecha"].apply(mes_key) == mes_vista]
+        if not ingresos_df.empty
+        else ingresos_df
+    )
+    gastos_vista_df = (
+        gastos_df[gastos_df["Fecha"].apply(mes_key) == mes_vista]
+        if not gastos_df.empty
+        else gastos_df
+    )
+    ingreso_mes_vista = float(ingresos_por_mes.get(mes_vista, 0.0))
+    depositado_mes_vista = float(depositos_raw.get(mes_vista, 0.0))
+    gerente_mes_vista = depositado_mes_vista * db.PORCENTAJE_GERENTE + float(
+        gerente_manual_por_mes.get(mes_vista, 0.0)
+    )
+    otros_mes_vista = float(otros_por_mes.get(mes_vista, 0.0))
+    total_ingresos_vista = ingreso_mes_vista
+    total_gerente_vista = gerente_mes_vista
+    total_otros_vista = otros_mes_vista
+    total_gastos_vista = gerente_mes_vista + otros_mes_vista
+    neto_vista = ingreso_mes_vista - gerente_mes_vista - otros_mes_vista
+    titulo_vista = mes_label(mes_vista)
+
 c1, c2, c3 = st.columns(3)
-c1.metric("Total pagos de alquiler", money(total_ingresos))
-c2.metric("Total gastos", money(total_gastos))
-c3.metric("Balance neto (despues de todos los gastos)", money(neto))
+c1.metric(f"Total pagos de alquiler ({titulo_vista})", money(total_ingresos_vista))
+c2.metric(f"Total gastos ({titulo_vista})", money(total_gastos_vista))
+c3.metric(f"Balance neto ({titulo_vista})", money(neto_vista))
 
 c4, c5 = st.columns(2)
-c4.metric(f"De los cuales: Pago a {db.MANAGER_NAME}", money(total_gerente))
-c5.metric("De los cuales: Otros gastos", money(total_otros_gastos))
+c4.metric(f"De los cuales: Pago a {db.MANAGER_NAME} ({titulo_vista})", money(total_gerente_vista))
+c5.metric(f"De los cuales: Otros gastos ({titulo_vista})", money(total_otros_vista))
 
 st.divider()
 
@@ -222,9 +283,9 @@ st.divider()
 
 col_a, col_b = st.columns(2)
 with col_a:
-    st.subheader("Pagos de alquiler")
-    if not ingresos_df.empty:
-        display_df = ingresos_df.rename(columns={"Concepto": "Inquilino"}).copy()
+    st.subheader(f"Pagos de alquiler ({titulo_vista})")
+    if not ingresos_vista_df.empty:
+        display_df = ingresos_vista_df.rename(columns={"Concepto": "Inquilino"}).copy()
         display_df["Fecha"] = display_df["Fecha"].apply(fecha_dmy)
         st.dataframe(
             display_df.assign(Monto=display_df["Monto"].apply(money)),
@@ -232,11 +293,11 @@ with col_a:
             hide_index=True,
         )
     else:
-        st.info("Aun no hay pagos de alquiler registrados.")
+        st.info("Aun no hay pagos de alquiler registrados en este mes.")
 with col_b:
-    st.subheader("Gastos")
-    if not gastos_df.empty:
-        display_gastos = gastos_df.rename(columns={"Categoria": "Tipo"}).copy()
+    st.subheader(f"Gastos ({titulo_vista})")
+    if not gastos_vista_df.empty:
+        display_gastos = gastos_vista_df.rename(columns={"Categoria": "Tipo"}).copy()
         display_gastos["Fecha"] = display_gastos["Fecha"].apply(fecha_dmy)
         st.dataframe(
             display_gastos.assign(Monto=display_gastos["Monto"].apply(money)),
@@ -244,25 +305,26 @@ with col_b:
             hide_index=True,
         )
     else:
-        st.info("Aun no hay gastos registrados.")
+        st.info("Aun no hay gastos registrados en este mes.")
 
 st.divider()
 
 pdf_bytes = build_pdf(
     empresa=empresa,
     fecha_reporte=fecha_reporte,
-    ingresos_df=ingresos_df,
-    gastos_df=gastos_df,
-    total_ingresos=total_ingresos,
-    total_gastos=total_gastos,
-    neto=neto,
+    ingresos_df=ingresos_vista_df,
+    gastos_df=gastos_vista_df,
+    total_ingresos=total_ingresos_vista,
+    total_gastos=total_gastos_vista,
+    neto=neto_vista,
     resumen_mensual_df=resumen_mensual_completo,
 )
 
+sufijo_archivo = "todos_los_meses" if ver_todos_los_meses else mes_vista
 st.download_button(
-    label="Descargar reporte PDF",
+    label=f"Descargar reporte PDF ({titulo_vista})",
     data=pdf_bytes,
-    file_name="reporte_contable_clary_albert.pdf",
+    file_name=f"reporte_contable_clary_albert_{sufijo_archivo}.pdf",
     mime="application/pdf",
 )
 
