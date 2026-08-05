@@ -150,34 +150,43 @@ The app automatically uses Supabase once it's configured, and otherwise
 quietly falls back to the local file. The homepage shows a small caption
 telling you which mode is currently active.
 
-### One-time Supabase setup (do this once for the live app)
+### Supabase project (already created for this app)
 
-1. Go to [supabase.com](https://supabase.com) and sign up for a free
-   account (you can sign up with your GitHub account -- the same
-   `jzamora71` account already used for this project).
-2. Click **New project**. Give it any name (e.g. `clary-albert-inversiones`),
-   choose any region close to you, and set a database password -- write
-   this password down somewhere safe, you'll need it in the next step.
-3. Wait about 1-2 minutes for the project to finish setting up.
-4. In the left sidebar, click the **Connect** button (or go to
-   **Project Settings > Database**). Look for the **Connection string**
-   section and copy the **URI** under "Session pooler" (recommended for
-   Streamlit Cloud). It looks like:
-   `postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:5432/postgres`
-5. Replace `[YOUR-PASSWORD]` in that string with the real database
-   password you set in step 2.
-6. Go to your app on [share.streamlit.io](https://share.streamlit.io),
+A Supabase project named **clary-albert-inversiones** has already been
+created (project ref `wkxrayfxrhagshoixcxh`, region `us-east-1`), and all
+four tables (`ingresos`, `gastos`, `inquilinos`, `depositos`) already
+exist in it with the 13 apartments pre-loaded. The only remaining step is
+getting the database password into Streamlit's Secrets -- this has to be
+done by you directly, since it's a private credential:
+
+1. Go to
+   [this project's database settings](https://supabase.com/dashboard/project/wkxrayfxrhagshoixcxh/settings/database)
+   (sign in with the same account you just used to connect Supabase).
+2. Look for **Database password**. If you don't already have it saved
+   from creation, click **Reset database password** (or **Generate a new
+   password**) -- this shows the password once, so copy it immediately.
+3. On the same page, find the **Connection string** section, switch to
+   the **Session pooler** tab, and copy the URI. It should look like:
+   `postgresql://postgres.wkxrayfxrhagshoixcxh:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres`
+4. Replace `[YOUR-PASSWORD]` in that string with the real password from
+   step 2.
+5. Go to your app on [share.streamlit.io](https://share.streamlit.io),
    click the **⋮** menu next to your app, then **Settings > Secrets**.
-7. Paste the following into the Secrets box, using your real connection
-   string from step 5:
+6. Paste the following into the Secrets box, using your real connection
+   string from step 4:
 
    ```toml
    [connections.supabase_db]
-   url = "postgresql://postgres.xxxxx:YOUR-PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres"
+   url = "postgresql://postgres.wkxrayfxrhagshoixcxh:YOUR-PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
    ```
-8. Click **Save**. The app will automatically restart and reconnect --
+7. Click **Save**. The app will automatically restart and reconnect --
    the homepage caption should switch to "Almacenamiento permanente
    activo (Supabase)".
+
+If you'd rather start fresh or create your own project instead, the
+general steps are the same: sign up at [supabase.com](https://supabase.com),
+click **New project**, wait for it to finish setting up, then follow
+steps 3-7 above using your own project's ref and region.
 
 **Never commit the real connection string to GitHub** -- it only goes
 into Streamlit's Secrets box, which is private and separate from the
