@@ -265,6 +265,7 @@ def build_pdf(
 
 
 def build_pagos_pdf(empresa, fecha_reporte, titulo_periodo, pagos_df, total_periodo):
+    # noqa: force-redeploy-refresh
     """One-page, printable PDF with just the rent-payment detail table and
     its total for whichever month (or 'Todos los meses') the user picked on
     the Pagos de Alquiler page -- so they can save/print a record for a
