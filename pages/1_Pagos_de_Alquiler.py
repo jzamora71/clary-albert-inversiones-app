@@ -20,7 +20,16 @@ import pandas as pd
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, fecha_dmy, init_session_state, mes_key, mes_label, money
+from utils import (
+    COMPANY_NAME,
+    build_pagos_pdf,
+    fecha_dmy,
+    init_session_state,
+    mes_key,
+    mes_label,
+    money,
+    rango_meses,
+)
 
 st.set_page_config(page_title=f"Pagos de Alquiler - {COMPANY_NAME}", page_icon="🏠", layout="wide")
 
@@ -122,19 +131,66 @@ if pagos:
     pagos_df = pd.DataFrame(pagos)[["apartamento", "nombre", "telefono", "fecha", "monto"]]
     pagos_df.columns = ["Apartamento", "Inquilino", "Telefono", "Fecha", "Monto"]
 
+    # Selector de mes a mostrar: por defecto solo el mes actual, con la
+    # opcion de ver todos los meses juntos si se necesita. Esto controla el
+    # cuadro de total y la tabla de abajo, y tambien el PDF para imprimir.
     mes_actual = mes_key(date.today().isoformat())
-    total_mes_actual = pagos_df.loc[
-        pagos_df["Fecha"].apply(mes_key) == mes_actual, "Monto"
-    ].sum()
+    meses_con_datos = set(pagos_df["Fecha"].apply(mes_key))
+    meses_opciones = sorted(
+        meses_con_datos | set(rango_meses(atras=12, adelante=2)) | {mes_actual}, reverse=True
+    )
+    opciones_selector = ["TODOS"] + meses_opciones
+    indice_default = opciones_selector.index(mes_actual) if mes_actual in opciones_selector else 0
+
+    mes_vista_pagos = st.selectbox(
+        "Mes a mostrar",
+        options=opciones_selector,
+        index=indice_default,
+        format_func=lambda clave: "Todos los meses" if clave == "TODOS" else mes_label(clave),
+        key="pagos_mes_vista",
+    )
+    st.caption(
+        "El total y la tabla de abajo muestran solo el mes seleccionado. "
+        "Elige 'Todos los meses' para ver el historial completo."
+    )
+
+    if mes_vista_pagos == "TODOS":
+        pagos_vista_df = pagos_df
+        titulo_vista_pagos = "Todos los meses"
+    else:
+        pagos_vista_df = pagos_df[pagos_df["Fecha"].apply(mes_key) == mes_vista_pagos]
+        titulo_vista_pagos = mes_label(mes_vista_pagos)
+
+    total_vista_pagos = pagos_vista_df["Monto"].sum()
     total_general_pagos = pagos_df["Monto"].sum()
 
     c1, c2 = st.columns(2)
-    c1.metric(f"Total de {mes_label(mes_actual)}", money(total_mes_actual))
-    c2.metric("Total general de pagos", money(total_general_pagos))
+    c1.metric(f"Total de {titulo_vista_pagos}", money(total_vista_pagos))
+    c2.metric("Total general de pagos (todos los meses)", money(total_general_pagos))
 
-    pagos_show = pagos_df.copy()
-    pagos_show["Fecha"] = pagos_show["Fecha"].apply(fecha_dmy)
-    pagos_show["Monto"] = pagos_show["Monto"].apply(money)
-    st.dataframe(pagos_show, use_container_width=True, hide_index=True)
+    if not pagos_vista_df.empty:
+        pagos_show = pagos_vista_df.copy()
+        pagos_show["Fecha"] = pagos_show["Fecha"].apply(fecha_dmy)
+        pagos_show["Monto"] = pagos_show["Monto"].apply(money)
+        st.dataframe(pagos_show, use_container_width=True, hide_index=True)
+
+        pdf_pagos_bytes = build_pagos_pdf(
+            empresa=COMPANY_NAME,
+            fecha_reporte=date.today(),
+            titulo_periodo=titulo_vista_pagos,
+            pagos_df=pagos_vista_df,
+            total_periodo=total_vista_pagos,
+        )
+        sufijo_pdf = (
+            "todos_los_meses" if mes_vista_pagos == "TODOS" else mes_vista_pagos
+        )
+        st.download_button(
+            f"Descargar / imprimir PDF ({titulo_vista_pagos})",
+            data=pdf_pagos_bytes,
+            file_name=f"pagos_alquiler_{sufijo_pdf}.pdf",
+            mime="application/pdf",
+        )
+    else:
+        st.info(f"No hay pagos de alquiler registrados en {titulo_vista_pagos}.")
 else:
     st.info("Aun no hay pagos de alquiler registrados.")

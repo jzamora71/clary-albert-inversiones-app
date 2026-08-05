@@ -38,30 +38,30 @@ st.info(
     "registran otros gastos (reparaciones, mantenimiento, etc.)."
 )
 
-st.subheader("Agregar gasto")
+st.subheader("Agregar gastos")
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    gasto_concepto = st.text_input("Descripcion del gasto", key="gasto_concepto")
+    gasto_concepto = st.text_input("Descripcion de gastos", key="gasto_concepto")
 with col2:
     gasto_monto = st.number_input(
-        "Monto del gasto",
+        "Monto de gastos",
         min_value=0.0,
         step=100.0,
         format="%.2f",
         key="gasto_monto",
     )
 with col3:
-    gasto_fecha = st.date_input("Fecha del gasto (dia/mes/año)", value=date.today(), key="gasto_fecha")
+    gasto_fecha = st.date_input("Fecha de gastos (dia/mes/año)", value=date.today(), key="gasto_fecha")
 
-if st.button("Agregar gasto", type="primary"):
+if st.button("Agregar gastos", type="primary"):
     if not gasto_concepto.strip():
-        st.error("Escribe una descripcion del gasto.")
+        st.error("Escribe una descripcion de gastos.")
     elif gasto_monto <= 0:
         st.error("El monto debe ser mayor que cero.")
     else:
         db.add_gasto(gasto_concepto.strip(), gasto_fecha.isoformat(), float(gasto_monto), categoria=db.TIPO_OTRO_GASTO)
-        st.success("Gasto registrado y guardado.")
+        st.success("Gastos registrados y guardados.")
         # Limpiar la descripcion y el monto para que el siguiente gasto
         # empiece en blanco, en vez de mostrar los datos del anterior.
         del st.session_state["gasto_concepto"]

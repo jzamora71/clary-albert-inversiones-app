@@ -262,3 +262,52 @@ def build_pdf(
         pdf_bytes = pdf_bytes.encode("latin-1")
 
     return pdf_bytes
+
+
+def build_pagos_pdf(empresa, fecha_reporte, titulo_periodo, pagos_df, total_periodo):
+    """One-page, printable PDF with just the rent-payment detail table and
+    its total for whichever month (or 'Todos los meses') the user picked on
+    the Pagos de Alquiler page -- so they can save/print a record for a
+    single month without pulling in expenses or the full monthly summary.
+    """
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, sanitize_text(f"Pagos de Alquiler - {empresa}"), ln=True)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, sanitize_text(f"Fecha del reporte: {fecha_es_larga(fecha_reporte)}"), ln=True)
+    pdf.cell(0, 8, sanitize_text(f"Periodo: {titulo_periodo}"), ln=True)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "Detalle de pagos", ln=True)
+
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(20, 8, "Apto", border=1)
+    pdf.cell(55, 8, "Inquilino", border=1)
+    pdf.cell(35, 8, "Telefono", border=1)
+    pdf.cell(35, 8, "Fecha", border=1)
+    pdf.cell(35, 8, "Monto", border=1, ln=True)
+
+    pdf.set_font("Helvetica", "", 10)
+    for _, row in pagos_df.iterrows():
+        pdf.cell(20, 8, str(row["Apartamento"]), border=1)
+        pdf.cell(55, 8, sanitize_text(str(row["Inquilino"]))[:28], border=1)
+        pdf.cell(35, 8, sanitize_text(str(row.get("Telefono", "")))[:18], border=1)
+        pdf.cell(35, 8, fecha_dmy(row["Fecha"]), border=1)
+        pdf.cell(35, 8, money_pdf(row["Monto"]), border=1, ln=True)
+
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, sanitize_text(f"Total {titulo_periodo}: {money_pdf(total_periodo)}"), ln=True)
+
+    pdf_bytes = pdf.output(dest="S")
+    if isinstance(pdf_bytes, bytearray):
+        pdf_bytes = bytes(pdf_bytes)
+    elif isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode("latin-1")
+
+    return pdf_bytes

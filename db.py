@@ -40,7 +40,7 @@ NUM_APARTAMENTOS = 13
 # automatically (see MANAGER_NAME / PORCENTAJE_GERENTE) from the monthly
 # bank deposit instead of being typed in as a plain expense.
 TIPO_PAGO_GERENTE = "Pago del gerente"
-TIPO_OTRO_GASTO = "Otro gasto"
+TIPO_OTRO_GASTO = "Otros gastos"
 TIPOS_GASTO = [TIPO_OTRO_GASTO]
 
 # The building manager is paid a fixed commission of whatever gets
@@ -283,7 +283,7 @@ def get_gastos():
     conn = get_conn()
     df = conn.query(
         "SELECT id, concepto, fecha, monto, "
-        "COALESCE(categoria, 'Otro gasto') AS categoria "
+        "COALESCE(categoria, 'Otros gastos') AS categoria "
         "FROM gastos ORDER BY fecha DESC, id DESC",
         ttl=0,
     )
