@@ -1,5 +1,10 @@
 """
-db.py -- Permanent storage for Ingresos and Gastos.
+db.py -- Permanent storage for the app's data:
+  - inquilinos: the tenant directory (13 apartments, name + contact number)
+  - ingresos: rent payments (used to be a generic "income" table; now every
+    row represents one tenant's monthly rent payment -- apartment number,
+    tenant name, contact number, date paid, and amount paid)
+  - gastos: expenses (unchanged)
 
 IMPORTANT BACKGROUND: Streamlit Community Cloud's free hosting does not
 guarantee local files survive app restarts/reboots/redeploys -- the
@@ -10,8 +15,8 @@ storage on the deployed app, even though it works fine for local testing.
 The real fix: connect to an external database that lives outside of
 Streamlit's own servers -- in this project, a free Supabase Postgres
 database. Once the connection details are added to Streamlit's "Secrets"
-(see README.md for the exact setup steps), every Ingreso/Gasto is written
-straight to Supabase and will never be lost by an app restart.
+(see README.md for the exact setup steps), every payment/expense is
+written straight to Supabase and will never be lost by an app restart.
 
 This module automatically uses Supabase when the secret is configured,
 and quietly falls back to a local data.db file otherwise (this fallback
@@ -26,6 +31,7 @@ from sqlalchemy import text
 
 DB_PATH = Path(__file__).parent / "data.db"
 CONNECTION_NAME = "supabase_db"
+NUM_APARTAMENTOS = 13
 
 
 def _has_supabase_secret():
@@ -53,9 +59,19 @@ def _id_column_sql(dialect_name):
     return "id SERIAL PRIMARY KEY"
 
 
+def _add_column_if_missing(session, table, column, coltype):
+    try:
+        session.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
+        session.commit()
+    except Exception:
+        session.rollback()
+
+
 def init_db():
     conn = get_conn()
-    id_col = _id_column_sql(conn.engine.dialect.name)
+    dialect = conn.engine.dialect.name
+    id_col = _id_column_sql(dialect)
+
     with conn.session as s:
         s.execute(text(
             f"CREATE TABLE IF NOT EXISTS ingresos ("
@@ -65,7 +81,99 @@ def init_db():
             f"CREATE TABLE IF NOT EXISTS gastos ("
             f"{id_col}, concepto TEXT NOT NULL, fecha TEXT NOT NULL, monto REAL NOT NULL)"
         ))
+        s.execute(text(
+            "CREATE TABLE IF NOT EXISTS inquilinos ("
+            "apartamento INTEGER PRIMARY KEY, nombre TEXT, telefono TEXT)"
+        ))
         s.commit()
+
+    # Rent payments now need apartment number + contact number too. These
+    # ALTERs only ever run once each -- if the columns already exist, the
+    # error is caught and ignored (see _add_column_if_missing).
+    with conn.session as s:
+        _add_column_if_missing(s, "ingresos", "apartamento", "INTEGER")
+        _add_column_if_missing(s, "ingresos", "telefono", "TEXT")
+
+    # Make sure all 13 apartments exist in the tenant directory so the
+    # payment form always has something to show, even before any tenant
+    # info has been entered.
+    with conn.session as s:
+        for apt in range(1, NUM_APARTAMENTOS + 1):
+            try:
+                if dialect == "sqlite":
+                    s.execute(
+                        text("INSERT OR IGNORE INTO inquilinos (apartamento, nombre, telefono) VALUES (:a, '', '')"),
+                        {"a": apt},
+                    )
+                else:
+                    s.execute(
+                        text(
+                            "INSERT INTO inquilinos (apartamento, nombre, telefono) VALUES (:a, '', '') "
+                            "ON CONFLICT (apartamento) DO NOTHING"
+                        ),
+                        {"a": apt},
+                    )
+            except Exception:
+                s.rollback()
+        s.commit()
+
+
+# --- Inquilinos (tenant directory) -----------------------------------------
+
+def get_inquilinos():
+    conn = get_conn()
+    df = conn.query(
+        "SELECT apartamento, nombre, telefono FROM inquilinos ORDER BY apartamento", ttl=0
+    )
+    return df.to_dict("records")
+
+
+def get_inquilino(apartamento):
+    for row in get_inquilinos():
+        if int(row["apartamento"]) == int(apartamento):
+            return row
+    return {"apartamento": apartamento, "nombre": "", "telefono": ""}
+
+
+def upsert_inquilino(apartamento, nombre, telefono):
+    conn = get_conn()
+    dialect = conn.engine.dialect.name
+    with conn.session as s:
+        if dialect == "sqlite":
+            s.execute(
+                text(
+                    "INSERT INTO inquilinos (apartamento, nombre, telefono) VALUES (:a, :n, :t) "
+                    "ON CONFLICT(apartamento) DO UPDATE SET nombre = :n, telefono = :t"
+                ),
+                {"a": apartamento, "n": nombre, "t": telefono},
+            )
+        else:
+            s.execute(
+                text(
+                    "INSERT INTO inquilinos (apartamento, nombre, telefono) VALUES (:a, :n, :t) "
+                    "ON CONFLICT (apartamento) DO UPDATE SET nombre = EXCLUDED.nombre, telefono = EXCLUDED.telefono"
+                ),
+                {"a": apartamento, "n": nombre, "t": telefono},
+            )
+        s.commit()
+
+
+# --- Ingresos / pagos de alquiler ------------------------------------------
+
+def add_pago_alquiler(apartamento, nombre, telefono, fecha, monto):
+    """Register one tenant's rent payment for the given date/amount."""
+    conn = get_conn()
+    with conn.session as s:
+        s.execute(
+            text(
+                "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono) "
+                "VALUES (:c, :f, :m, :a, :t)"
+            ),
+            {"c": nombre, "f": fecha, "m": monto, "a": apartamento, "t": telefono},
+        )
+        s.commit()
+    # Keep the tenant directory in sync so next month's form is pre-filled.
+    upsert_inquilino(apartamento, nombre, telefono)
 
 
 def add_ingreso(concepto, fecha, monto):
@@ -96,6 +204,17 @@ def get_ingresos():
     return df.to_dict("records")
 
 
+def get_pagos_alquiler():
+    """Rent payments with apartment number and contact number included."""
+    conn = get_conn()
+    df = conn.query(
+        "SELECT id, apartamento, concepto AS nombre, telefono, fecha, monto "
+        "FROM ingresos ORDER BY fecha DESC, id DESC",
+        ttl=0,
+    )
+    return df.to_dict("records")
+
+
 def get_gastos():
     conn = get_conn()
     df = conn.query(
@@ -120,12 +239,29 @@ def delete_gasto(row_id):
 
 def import_ingresos_df(df):
     conn = get_conn()
+    has_apt = "Apartamento" in df.columns
+    has_tel = "Telefono" in df.columns
     with conn.session as s:
         for _, row in df.iterrows():
-            s.execute(
-                text("INSERT INTO ingresos (concepto, fecha, monto) VALUES (:c, :f, :m)"),
-                {"c": str(row["Concepto"]), "f": str(row["Fecha"]), "m": float(row["Monto"])},
-            )
+            if has_apt or has_tel:
+                s.execute(
+                    text(
+                        "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono) "
+                        "VALUES (:c, :f, :m, :a, :t)"
+                    ),
+                    {
+                        "c": str(row["Concepto"]) if "Concepto" in df.columns else str(row.get("nombre", "")),
+                        "f": str(row["Fecha"]),
+                        "m": float(row["Monto"]),
+                        "a": int(row["Apartamento"]) if has_apt and str(row["Apartamento"]).strip() != "" else None,
+                        "t": str(row["Telefono"]) if has_tel else "",
+                    },
+                )
+            else:
+                s.execute(
+                    text("INSERT INTO ingresos (concepto, fecha, monto) VALUES (:c, :f, :m)"),
+                    {"c": str(row["Concepto"]), "f": str(row["Fecha"]), "m": float(row["Monto"])},
+                )
         s.commit()
 
 

@@ -5,10 +5,10 @@ Runs only when the user clicks "Reporte" in the sidebar or the
 "Ver Reporte" button on the homepage. The PDF is only generated when this
 page is actually opened, never when app.py first loads.
 
-Ingresos/Gastos are read from data.db (see db.py), which survives normal
-app restarts. As a safety net -- since Streamlit's free hosting doesn't
-guarantee the database file survives a full redeploy or manual reboot --
-this page also offers a CSV backup download and a CSV restore uploader.
+Pagos de alquiler / Gastos are read through db.py, which uses Supabase
+(permanent) once configured, or a local file (not persistent when
+deployed) otherwise. As a safety net either way, this page also offers a
+CSV backup download and a CSV restore uploader.
 """
 
 from datetime import date
@@ -32,15 +32,21 @@ st.caption(f"{COMPANY_NAME} - Reporte contable")
 empresa = st.text_input("Nombre de la empresa", value=COMPANY_NAME)
 fecha_reporte = st.date_input("Fecha del reporte", value=date.today())
 
-ingresos_raw = db.get_ingresos()
+pagos_raw = db.get_pagos_alquiler()
 gastos_raw = db.get_gastos()
 
 ingresos_df = (
-    pd.DataFrame(ingresos_raw)[["concepto", "fecha", "monto"]].rename(
-        columns={"concepto": "Concepto", "fecha": "Fecha", "monto": "Monto"}
+    pd.DataFrame(pagos_raw)[["apartamento", "nombre", "telefono", "fecha", "monto"]].rename(
+        columns={
+            "apartamento": "Apartamento",
+            "nombre": "Concepto",
+            "telefono": "Telefono",
+            "fecha": "Fecha",
+            "monto": "Monto",
+        }
     )
-    if ingresos_raw
-    else pd.DataFrame(columns=["Concepto", "Fecha", "Monto"])
+    if pagos_raw
+    else pd.DataFrame(columns=["Apartamento", "Concepto", "Telefono", "Fecha", "Monto"])
 )
 gastos_df = (
     pd.DataFrame(gastos_raw)[["concepto", "fecha", "monto"]].rename(
@@ -55,7 +61,7 @@ total_gastos = gastos_df["Monto"].sum() if not gastos_df.empty else 0.0
 neto = total_ingresos - total_gastos
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Total ingresos", money(total_ingresos))
+c1.metric("Total pagos de alquiler", money(total_ingresos))
 c2.metric("Total gastos", money(total_gastos))
 c3.metric("Balance neto", money(neto))
 
@@ -63,15 +69,24 @@ st.divider()
 
 col_a, col_b = st.columns(2)
 with col_a:
-    st.subheader("Ingresos")
+    st.subheader("Pagos de alquiler")
     if not ingresos_df.empty:
-        st.dataframe(ingresos_df.assign(Monto=ingresos_df["Monto"].apply(money)), use_container_width=True)
+        display_df = ingresos_df.rename(columns={"Concepto": "Inquilino"})
+        st.dataframe(
+            display_df.assign(Monto=display_df["Monto"].apply(money)),
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
-        st.info("Aun no hay ingresos registrados.")
+        st.info("Aun no hay pagos de alquiler registrados.")
 with col_b:
     st.subheader("Gastos")
     if not gastos_df.empty:
-        st.dataframe(gastos_df.assign(Monto=gastos_df["Monto"].apply(money)), use_container_width=True)
+        st.dataframe(
+            gastos_df.assign(Monto=gastos_df["Monto"].apply(money)),
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
         st.info("Aun no hay gastos registrados.")
 
@@ -97,9 +112,9 @@ st.download_button(
 st.divider()
 
 # --- Backup / restore -------------------------------------------------
-# Safety net in case the app's database file is ever wiped by a Streamlit
-# Cloud reboot or redeploy: download a CSV copy regularly, and restore
-# from it here if the numbers ever come back empty unexpectedly.
+# Safety net either way: download a CSV copy regularly, and restore from
+# it here if the numbers ever come back empty unexpectedly (e.g. before
+# Supabase was configured, or if a secret gets misconfigured).
 with st.expander("💾 Respaldo y restauracion de datos"):
     st.markdown(
         "Descarga una copia de tus datos de vez en cuando. Si alguna vez "
@@ -110,9 +125,9 @@ with st.expander("💾 Respaldo y restauracion de datos"):
     back_col1, back_col2 = st.columns(2)
     with back_col1:
         st.download_button(
-            "Descargar respaldo de Ingresos (CSV)",
+            "Descargar respaldo de Pagos de Alquiler (CSV)",
             data=ingresos_df.to_csv(index=False).encode("utf-8"),
-            file_name="respaldo_ingresos.csv",
+            file_name="respaldo_pagos_alquiler.csv",
             mime="text/csv",
         )
     with back_col2:
@@ -128,12 +143,14 @@ with st.expander("💾 Respaldo y restauracion de datos"):
 
     restore_col1, restore_col2 = st.columns(2)
     with restore_col1:
-        ingresos_upload = st.file_uploader("Subir respaldo de Ingresos (CSV)", type="csv", key="ingresos_upload")
+        ingresos_upload = st.file_uploader(
+            "Subir respaldo de Pagos de Alquiler (CSV)", type="csv", key="ingresos_upload"
+        )
         if ingresos_upload is not None:
-            if st.button("Restaurar Ingresos desde este archivo"):
+            if st.button("Restaurar Pagos de Alquiler desde este archivo"):
                 restore_df = pd.read_csv(ingresos_upload)
                 db.import_ingresos_df(restore_df)
-                st.success("Ingresos restaurados. Recarga la pagina para verlos.")
+                st.success("Pagos de alquiler restaurados. Recarga la pagina para verlos.")
     with restore_col2:
         gastos_upload = st.file_uploader("Subir respaldo de Gastos (CSV)", type="csv", key="gastos_upload")
         if gastos_upload is not None:

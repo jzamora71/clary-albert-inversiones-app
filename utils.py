@@ -94,27 +94,46 @@ def build_pdf(empresa, fecha_reporte, ingresos_df, gastos_df, total_ingresos, to
     pdf.cell(0, 8, "Resumen", ln=True)
 
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 7, f"Total ingresos: {money_pdf(total_ingresos)}", ln=True)
+    pdf.cell(0, 7, f"Total pagos de alquiler: {money_pdf(total_ingresos)}", ln=True)
     pdf.cell(0, 7, f"Total gastos: {money_pdf(total_gastos)}", ln=True)
     pdf.cell(0, 7, f"Balance neto: {money_pdf(neto)}", ln=True)
     pdf.ln(6)
 
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, "Ingresos", ln=True)
+    pdf.cell(0, 8, "Pagos de Alquiler", ln=True)
+
+    has_apartamento = "Apartamento" in ingresos_df.columns
 
     pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(95, 8, "Concepto", border=1)
-    pdf.cell(40, 8, "Fecha", border=1)
-    pdf.cell(45, 8, "Monto", border=1, ln=True)
+    if has_apartamento:
+        pdf.cell(20, 8, "Apto", border=1)
+        pdf.cell(55, 8, "Inquilino", border=1)
+        pdf.cell(35, 8, "Telefono", border=1)
+        pdf.cell(35, 8, "Fecha", border=1)
+        pdf.cell(35, 8, "Monto", border=1, ln=True)
+    else:
+        pdf.cell(95, 8, "Concepto", border=1)
+        pdf.cell(40, 8, "Fecha", border=1)
+        pdf.cell(45, 8, "Monto", border=1, ln=True)
 
     pdf.set_font("Helvetica", "", 10)
     for _, row in ingresos_df.iterrows():
-        concepto = sanitize_text(str(row["Concepto"]))[:45]
         fecha_txt = str(row["Fecha"])
         monto_txt = money_pdf(row["Monto"])
-        pdf.cell(95, 8, concepto, border=1)
-        pdf.cell(40, 8, fecha_txt, border=1)
-        pdf.cell(45, 8, monto_txt, border=1, ln=True)
+        if has_apartamento:
+            apto_txt = str(row["Apartamento"]) if str(row["Apartamento"]) != "nan" else ""
+            inquilino_txt = sanitize_text(str(row["Concepto"]))[:28]
+            telefono_txt = sanitize_text(str(row.get("Telefono", "")))[:18]
+            pdf.cell(20, 8, apto_txt, border=1)
+            pdf.cell(55, 8, inquilino_txt, border=1)
+            pdf.cell(35, 8, telefono_txt, border=1)
+            pdf.cell(35, 8, fecha_txt, border=1)
+            pdf.cell(35, 8, monto_txt, border=1, ln=True)
+        else:
+            concepto = sanitize_text(str(row["Concepto"]))[:45]
+            pdf.cell(95, 8, concepto, border=1)
+            pdf.cell(40, 8, fecha_txt, border=1)
+            pdf.cell(45, 8, monto_txt, border=1, ln=True)
 
     pdf.ln(6)
 

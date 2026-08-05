@@ -82,9 +82,9 @@ st.markdown(
 st.markdown(
     """
     <p style="text-align:center; color:#475569; font-size:16px; max-width:520px; margin:0 auto 24px auto;">
-        Bienvenido. Desde aqui puedes registrar ingresos, registrar gastos y
-        generar el reporte contable en PDF. Usa los botones abajo o el menu
-        de la izquierda para navegar.
+        Bienvenido. Desde aqui puedes registrar los pagos de alquiler de los
+        13 apartamentos, registrar gastos y generar el reporte contable en
+        PDF. Usa los botones abajo o el menu de la izquierda para navegar.
     </p>
     """,
     unsafe_allow_html=True,
@@ -96,7 +96,7 @@ total_gastos = sum(item["monto"] for item in db.get_gastos())
 neto = total_ingresos - total_gastos
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Ingresos totales", money(total_ingresos))
+c1.metric("Pagos de alquiler totales", money(total_ingresos))
 c2.metric("Gastos totales", money(total_gastos))
 c3.metric("Balance neto", money(neto))
 
@@ -108,8 +108,8 @@ st.divider()
 nav_col1, nav_col2, nav_col3 = st.columns(3)
 
 with nav_col1:
-    if st.button("📥 Ver Ingresos", use_container_width=True):
-        st.switch_page("pages/1_Ingresos.py")
+    if st.button("🏠 Ver Pagos de Alquiler", use_container_width=True):
+        st.switch_page("pages/1_Pagos_de_Alquiler.py")
 
 with nav_col2:
     if st.button("📤 Ver Gastos", use_container_width=True):
@@ -121,7 +121,7 @@ with nav_col3:
 
 st.caption(
     "Tambien puedes usar el menu de navegacion en la barra lateral izquierda "
-    "para ir directamente a Ingresos, Gastos o Reporte."
+    "para ir directamente a Pagos de Alquiler, Gastos o Reporte."
 )
 
 # --- Storage status (helps confirm permanent storage is active) -----------

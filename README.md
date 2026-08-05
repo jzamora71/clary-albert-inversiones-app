@@ -6,13 +6,13 @@
 clary_albert_app/
   app.py                 <- Homepage ONLY (logo, welcome message, nav buttons)
   utils.py                <- Shared helpers used by every page
-  db.py                    <- Permanent storage (SQLite) for Ingresos/Gastos
-  data.db                  <- The database file itself (created automatically, not in git)
+  db.py                    <- Permanent storage for Inquilinos/Pagos de Alquiler/Gastos
+  data.db                  <- Local fallback database file (created automatically, not in git)
   requirements.txt
   assets/
     logo.png              <- Real logo
   pages/
-    1_Ingresos.py          <- Income entry report
+    1_Pagos_de_Alquiler.py <- Tenant directory + monthly rent payment tracker (13 apartments)
     2_Gastos.py             <- Expense entry report
     3_Reporte.py            <- Summary + PDF export + backup/restore report
 ```
@@ -20,7 +20,28 @@ clary_albert_app/
 Streamlit automatically turns every file inside `/pages` into a sidebar
 navigation item. The numeric prefix (`1_`, `2_`, `3_`) controls the order
 they appear in the sidebar; Streamlit strips the number and underscores
-when showing the label (so `1_Ingresos.py` shows as "Ingresos").
+when showing the label (so `1_Pagos_de_Alquiler.py` shows as "Pagos de
+Alquiler").
+
+## Pagos de Alquiler (rent payments)
+
+The old generic "Agregar ingreso" form was replaced with a page built
+specifically for this 13-apartment building:
+
+- **Directorio de inquilinos** — an editable table (apartments 1-13) that
+  stores each tenant's name and contact number, so the payment form can
+  remember who lives where.
+- **Registrar pago de alquiler** — select the apartment (1-13), confirm or
+  update the tenant's name/phone, pick the payment date, enter the amount,
+  and click "Registrar pago". This is saved permanently and also counts as
+  income everywhere else in the app (homepage totals, Reporte, PDF export).
+- **Historial de pagos** — every payment ever registered, with apartment
+  number, tenant name, phone, date, and amount.
+
+Under the hood this still uses the same `ingresos` table as before (with
+two new columns, `apartamento` and `telefono`), so no existing data is
+lost and the rest of the app (Reporte totals, PDF, CSV backup/restore)
+keeps working without any extra setup.
 
 ## Why the report no longer opens automatically
 
