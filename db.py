@@ -33,13 +33,20 @@ DB_PATH = Path(__file__).parent / "data.db"
 CONNECTION_NAME = "supabase_db"
 NUM_APARTAMENTOS = 13
 
-# Expense categories. "Pago del gerente" is tracked separately from other
-# expenses so the monthly/overall report can show exactly how much of the
-# rent income went to the manager vs. everything else, while both still
-# count as gastos and get subtracted from ingresos.
+# Expense categories. "Pago del gerente" is kept as a label for backward
+# compatibility with any expense rows entered manually before the
+# automatic commission below existed. Going forward the Gastos page only
+# lets you pick "Otro gasto" -- the manager's pay is calculated
+# automatically (see MANAGER_NAME / PORCENTAJE_GERENTE) from the monthly
+# bank deposit instead of being typed in as a plain expense.
 TIPO_PAGO_GERENTE = "Pago del gerente"
 TIPO_OTRO_GASTO = "Otro gasto"
-TIPOS_GASTO = [TIPO_PAGO_GERENTE, TIPO_OTRO_GASTO]
+TIPOS_GASTO = [TIPO_OTRO_GASTO]
+
+# The building manager is paid a fixed commission of whatever gets
+# deposited into the bank account each month.
+MANAGER_NAME = "Rafael Guerrero"
+PORCENTAJE_GERENTE = 0.10
 
 
 def _has_supabase_secret():
@@ -92,6 +99,10 @@ def init_db():
         s.execute(text(
             "CREATE TABLE IF NOT EXISTS inquilinos ("
             "apartamento INTEGER PRIMARY KEY, nombre TEXT, telefono TEXT)"
+        ))
+        s.execute(text(
+            "CREATE TABLE IF NOT EXISTS depositos ("
+            "mes TEXT PRIMARY KEY, monto REAL NOT NULL DEFAULT 0)"
         ))
         s.commit()
 
@@ -163,6 +174,50 @@ def upsert_inquilino(apartamento, nombre, telefono):
                     "ON CONFLICT (apartamento) DO UPDATE SET nombre = EXCLUDED.nombre, telefono = EXCLUDED.telefono"
                 ),
                 {"a": apartamento, "n": nombre, "t": telefono},
+            )
+        s.commit()
+
+
+# --- Depositos bancarios mensuales / pago al gerente -----------------------
+
+def get_depositos():
+    """All monthly bank-deposit amounts, keyed by 'YYYY-MM'."""
+    conn = get_conn()
+    df = conn.query("SELECT mes, monto FROM depositos ORDER BY mes", ttl=0)
+    return df.to_dict("records")
+
+
+def get_deposito(mes):
+    """Deposit amount registered for one month ('YYYY-MM'), or 0.0."""
+    for row in get_depositos():
+        if row["mes"] == mes:
+            return float(row["monto"])
+    return 0.0
+
+
+def upsert_deposito(mes, monto):
+    """Save/update the amount deposited in the bank for one month. The
+    manager's pay for that month is always PORCENTAJE_GERENTE of this
+    value -- it is computed on the fly wherever it's needed, never stored
+    as a separate number, so it's always in sync with the deposit."""
+    conn = get_conn()
+    dialect = conn.engine.dialect.name
+    with conn.session as s:
+        if dialect == "sqlite":
+            s.execute(
+                text(
+                    "INSERT INTO depositos (mes, monto) VALUES (:m, :v) "
+                    "ON CONFLICT(mes) DO UPDATE SET monto = :v"
+                ),
+                {"m": mes, "v": monto},
+            )
+        else:
+            s.execute(
+                text(
+                    "INSERT INTO depositos (mes, monto) VALUES (:m, :v) "
+                    "ON CONFLICT (mes) DO UPDATE SET monto = EXCLUDED.monto"
+                ),
+                {"m": mes, "v": monto},
             )
         s.commit()
 

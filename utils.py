@@ -77,6 +77,20 @@ def mes_label(year_month_key):
         return year_month_key
 
 
+def rango_meses(atras=12, adelante=2, referencia=None):
+    """List of 'YYYY-MM' keys from `atras` months before today to
+    `adelante` months after -- used to populate month-picker dropdowns
+    (e.g. for registering a bank deposit for a given month)."""
+    ref = referencia or datetime.today().date()
+    base = ref.year * 12 + (ref.month - 1)
+    meses = []
+    for offset in range(-atras, adelante + 1):
+        idx = base + offset
+        year, month = divmod(idx, 12)
+        meses.append(f"{year:04d}-{month + 1:02d}")
+    return meses
+
+
 def money(x):
     value = Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return f"RD$ {value:,.2f}"
@@ -217,22 +231,29 @@ def build_pdf(
         pdf.set_font("Helvetica", "B", 13)
         pdf.cell(0, 8, "Resumen Mensual", ln=True)
 
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(45, 8, "Mes", border=1)
-        pdf.cell(38, 8, "Alquiler", border=1)
-        pdf.cell(38, 8, "Gerente", border=1)
-        pdf.cell(38, 8, "Otros Gastos", border=1)
-        pdf.cell(31, 8, "Balance", border=1, ln=True)
+        has_depositado = "Monto Depositado" in resumen_mensual_df.columns
+        gerente_col = "Pago al Gerente" if "Pago al Gerente" in resumen_mensual_df.columns else "Pago del Gerente"
 
-        pdf.set_font("Helvetica", "", 10)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(32, 8, "Mes", border=1)
+        pdf.cell(29, 8, "Alquiler", border=1)
+        if has_depositado:
+            pdf.cell(29, 8, "Depositado", border=1)
+        pdf.cell(29, 8, "Gerente", border=1)
+        pdf.cell(29, 8, "Otros", border=1)
+        pdf.cell(29 if has_depositado else 34, 8, "Balance", border=1, ln=True)
+
+        pdf.set_font("Helvetica", "", 9)
         for _, row in resumen_mensual_df.iterrows():
             is_total = str(row["Mes"]).strip().lower().startswith("total")
-            pdf.set_font("Helvetica", "B" if is_total else "", 10)
-            pdf.cell(45, 8, sanitize_text(str(row["Mes"]))[:22], border=1)
-            pdf.cell(38, 8, money_pdf(row["Pagos de Alquiler"]), border=1)
-            pdf.cell(38, 8, money_pdf(row["Pago del Gerente"]), border=1)
-            pdf.cell(38, 8, money_pdf(row["Otros Gastos"]), border=1)
-            pdf.cell(31, 8, money_pdf(row["Balance del Mes"]), border=1, ln=True)
+            pdf.set_font("Helvetica", "B" if is_total else "", 9)
+            pdf.cell(32, 8, sanitize_text(str(row["Mes"]))[:18], border=1)
+            pdf.cell(29, 8, money_pdf(row["Pagos de Alquiler"]), border=1)
+            if has_depositado:
+                pdf.cell(29, 8, money_pdf(row["Monto Depositado"]), border=1)
+            pdf.cell(29, 8, money_pdf(row[gerente_col]), border=1)
+            pdf.cell(29, 8, money_pdf(row["Otros Gastos"]), border=1)
+            pdf.cell(29 if has_depositado else 34, 8, money_pdf(row["Balance del Mes"]), border=1, ln=True)
 
     pdf_bytes = pdf.output(dest="S")
     if isinstance(pdf_bytes, bytearray):

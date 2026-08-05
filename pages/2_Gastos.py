@@ -4,11 +4,11 @@ pages/2_Gastos.py -- Expense entry report.
 Runs only when the user clicks "Gastos" in the sidebar or the "Ver Gastos"
 button on the homepage. Never runs automatically on app.py load.
 
-Every expense is tagged with a "Tipo de gasto": either "Pago del gerente"
-(the manager's payment) or "Otro gasto" (anything else). Both are still
-gastos and both subtract from the rent income in the Reporte page -- the
-category just lets the report show how much went to the manager vs.
-everything else.
+The manager's payment is NOT entered here anymore -- it's calculated
+automatically as a percentage of the monthly bank deposit on the Reporte
+page (see pages/3_Reporte.py and db.MANAGER_NAME / db.PORCENTAJE_GERENTE).
+This page is only for other expenses (repairs, maintenance, supplies,
+etc.), which still subtract from the rent income in the Reporte page.
 
 Data is saved permanently to data.db (see db.py) instead of only living in
 st.session_state, so it survives closing the app and reopening it later.
@@ -31,19 +31,18 @@ st.page_link("app.py", label="🏠 Volver al inicio", icon=None)
 
 st.title("📤 Gastos")
 st.caption(f"{COMPANY_NAME} - Registro de gastos (guardado permanentemente)")
+st.info(
+    f"El pago del gerente **{db.MANAGER_NAME}** ya no se registra aqui -- se "
+    f"calcula automaticamente como el {int(db.PORCENTAJE_GERENTE * 100)}% del "
+    "deposito bancario del mes, en la pagina **Reporte**. Aqui solo se "
+    "registran otros gastos (reparaciones, mantenimiento, etc.)."
+)
 
 st.subheader("Agregar gasto")
 
-col0, col1 = st.columns(2)
-with col0:
-    gasto_tipo = st.selectbox("Tipo de gasto", db.TIPOS_GASTO, key="gasto_tipo")
+col1, col2, col3 = st.columns(3)
 with col1:
-    etiqueta_concepto = (
-        "Descripcion del gasto" if gasto_tipo == db.TIPO_OTRO_GASTO else "Nota (opcional)"
-    )
-    gasto_concepto = st.text_input(etiqueta_concepto, key="gasto_concepto")
-
-col2, col3 = st.columns(2)
+    gasto_concepto = st.text_input("Descripcion del gasto", key="gasto_concepto")
 with col2:
     gasto_monto = st.number_input(
         "Monto del gasto",
@@ -56,12 +55,13 @@ with col3:
     gasto_fecha = st.date_input("Fecha del gasto (dia/mes/año)", value=date.today(), key="gasto_fecha")
 
 if st.button("Agregar gasto", type="primary"):
-    if gasto_monto <= 0:
+    if not gasto_concepto.strip():
+        st.error("Escribe una descripcion del gasto.")
+    elif gasto_monto <= 0:
         st.error("El monto debe ser mayor que cero.")
     else:
-        concepto_final = gasto_concepto.strip() or gasto_tipo
-        db.add_gasto(concepto_final, gasto_fecha.isoformat(), float(gasto_monto), categoria=gasto_tipo)
-        st.success(f"Gasto de tipo '{gasto_tipo}' registrado y guardado.")
+        db.add_gasto(gasto_concepto.strip(), gasto_fecha.isoformat(), float(gasto_monto), categoria=db.TIPO_OTRO_GASTO)
+        st.success("Gasto registrado y guardado.")
         st.rerun()
 
 st.divider()
@@ -75,12 +75,6 @@ if gastos:
     gastos_show["Fecha"] = gastos_show["Fecha"].apply(fecha_dmy)
     gastos_show["Monto"] = gastos_show["Monto"].apply(money)
     st.dataframe(gastos_show, use_container_width=True, hide_index=True)
-
-    total_gerente = gastos_df.loc[gastos_df["Tipo"] == db.TIPO_PAGO_GERENTE, "Monto"].sum()
-    total_otros = gastos_df.loc[gastos_df["Tipo"] != db.TIPO_PAGO_GERENTE, "Monto"].sum()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Pago del gerente (total)", money(total_gerente))
-    c2.metric("Otros gastos (total)", money(total_otros))
-    c3.metric("Total gastos", money(total_gerente + total_otros))
+    st.metric("Total gastos", money(gastos_df["Monto"].sum()))
 else:
     st.info("Aun no hay gastos registrados.")

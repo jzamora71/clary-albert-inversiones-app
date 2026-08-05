@@ -43,25 +43,45 @@ two new columns, `apartamento` and `telefono`), so no existing data is
 lost and the rest of the app (Reporte totals, PDF, CSV backup/restore)
 keeps working without any extra setup.
 
-## Gastos: Pago del gerente vs. Otros gastos
+## Gastos: solo "Otros gastos" now (manager pay moved to Reporte)
 
-Every expense on the **Gastos** page is now tagged with a **Tipo de
-gasto**: either "Pago del gerente" (the building manager's payment) or
-"Otro gasto" (anything else -- repairs, maintenance, supplies, etc.).
-Both types are still expenses and both get subtracted from the rent
-income, but tracking them separately lets the Reporte page show exactly
-how much went to the manager vs. everything else each month.
+The **Gastos** page is only for expenses other than the manager's pay --
+repairs, maintenance, supplies, etc. All entries are saved with the
+category "Otro gasto" and get subtracted from rent income like before.
+
+Manually registering the manager's payment as a Gasto is now
+**deprecated**. Any old "Pago del gerente" entries created before this
+change still count (for backward compatibility), but going forward the
+manager's pay is calculated automatically -- see the next section.
+
+## Pago automatico al gerente (10% del deposito bancario)
+
+The manager, **Rafael Guerrero**, is paid **10% of whatever amount was
+deposited into the bank account that month** -- not 10% of rent
+collected. Because the deposit total does not always match the sum of
+that month's rent payments exactly, it's entered separately:
+
+- On the **Reporte** page, under "Deposito bancario mensual y pago a
+  Rafael Guerrero", pick a month and type in the amount deposited into
+  the bank that month, then click "Guardar deposito de este mes".
+- The 10% commission is calculated instantly and shown live as you type
+  (`Pago a Rafael Guerrero`), and is saved permanently once you click
+  save (in the new `depositos` table in `db.py`).
+- This calculated amount is automatically treated as an expense and
+  subtracted from the balance everywhere in the app -- top metrics,
+  monthly summary, and PDF report -- with no need to also add it as a
+  Gasto.
 
 ## Resumen mensual y gran total (Reporte)
 
-The Reporte page now includes a **Resumen mensual** table that groups
-every rent payment and expense by calendar month, showing for each
-month: total rent collected, the manager's payment, other expenses, and
-the balance left over. The last row, **Total general**, adds up every
-month into a single grand total -- i.e. all rent income minus the
-manager's pay and all other expenses, across the whole history of the
-app. This same table is also printed at the end of the downloadable PDF
-report.
+The Reporte page includes a **Resumen mensual** table that groups every
+rent payment, bank deposit, and expense by calendar month, showing for
+each month: total rent collected, the amount deposited in the bank, the
+automatic 10% payment to Rafael Guerrero, other expenses, and the
+balance left over. The last row, **Total general**, adds up every month
+into a single grand total -- i.e. all rent income minus the manager's
+pay and all other expenses, across the whole history of the app. This
+same table is also printed at the end of the downloadable PDF report.
 
 ## Dates shown as dia/mes/año
 

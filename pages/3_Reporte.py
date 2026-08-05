@@ -10,10 +10,14 @@ Pagos de alquiler / Gastos are read through db.py, which uses Supabase
 deployed) otherwise. As a safety net either way, this page also offers a
 CSV backup download and a CSV restore uploader.
 
-This page also builds a month-by-month summary (income, manager payment,
-other expenses, and the balance left over each month) plus a grand total
-row at the end, so it's easy to see how much rent came in and how much is
-left once the manager's pay and other expenses have been deducted.
+The manager's pay is calculated automatically here: each month you enter
+how much was deposited into the bank account, and the report computes
+PORCENTAJE_GERENTE (10%) of that as the amount owed to db.MANAGER_NAME
+(Rafael Guerrero). That amount is treated as an expense and subtracted
+from the balance, right alongside any other expenses entered on the
+Gastos page. The monthly summary table shows rent collected, the amount
+deposited, the manager's cut, other expenses, and the balance left over
+each month, ending with a running "Total general" row.
 """
 
 from datetime import date
@@ -22,7 +26,16 @@ import pandas as pd
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, build_pdf, fecha_dmy, init_session_state, mes_key, mes_label, money
+from utils import (
+    COMPANY_NAME,
+    build_pdf,
+    fecha_dmy,
+    init_session_state,
+    mes_key,
+    mes_label,
+    money,
+    rango_meses,
+)
 
 st.set_page_config(page_title=f"Reporte - {COMPANY_NAME}", page_icon="📊", layout="wide")
 
@@ -37,8 +50,10 @@ st.caption(f"{COMPANY_NAME} - Reporte contable")
 empresa = st.text_input("Nombre de la empresa", value=COMPANY_NAME)
 fecha_reporte = st.date_input("Fecha del reporte (dia/mes/año)", value=date.today())
 
+# --- Load everything needed for the totals and the monthly summary --------
 pagos_raw = db.get_pagos_alquiler()
 gastos_raw = db.get_gastos()
+depositos_raw = {row["mes"]: float(row["monto"]) for row in db.get_depositos()}
 
 ingresos_df = (
     pd.DataFrame(pagos_raw)[["apartamento", "nombre", "telefono", "fecha", "monto"]].rename(
@@ -61,40 +76,15 @@ gastos_df = (
     else pd.DataFrame(columns=["Categoria", "Concepto", "Fecha", "Monto"])
 )
 
-total_ingresos = ingresos_df["Monto"].sum() if not ingresos_df.empty else 0.0
-total_gastos = gastos_df["Monto"].sum() if not gastos_df.empty else 0.0
-total_gerente = (
-    gastos_df.loc[gastos_df["Categoria"] == db.TIPO_PAGO_GERENTE, "Monto"].sum()
-    if not gastos_df.empty
-    else 0.0
-)
-total_otros_gastos = total_gastos - total_gerente
-neto = total_ingresos - total_gastos
-
-c1, c2, c3 = st.columns(3)
-c1.metric("Total pagos de alquiler", money(total_ingresos))
-c2.metric("Total gastos", money(total_gastos))
-c3.metric("Balance neto (despues de todos los gastos)", money(neto))
-
-c4, c5 = st.columns(2)
-c4.metric("De los cuales: Pago del gerente", money(total_gerente))
-c5.metric("De los cuales: Otros gastos", money(total_otros_gastos))
-
-st.divider()
-
-# --- Resumen mensual: total por mes y gran total al final -----------------
-st.subheader("Resumen mensual")
-st.caption(
-    "Total de pagos de alquiler por mes, con el pago del gerente y otros "
-    "gastos ya restados. La ultima fila es el gran total acumulado."
-)
-
+# --- Group everything by month ---------------------------------------------
 ingresos_por_mes = (
     ingresos_df.assign(Mes=ingresos_df["Fecha"].apply(mes_key)).groupby("Mes")["Monto"].sum()
     if not ingresos_df.empty
     else pd.Series(dtype=float)
 )
-gerente_por_mes = (
+# Legacy manual "Pago del gerente" expense rows -- kept so nothing entered
+# before this automatic calculation existed silently disappears.
+gerente_manual_por_mes = (
     gastos_df.loc[gastos_df["Categoria"] == db.TIPO_PAGO_GERENTE]
     .assign(Mes=lambda d: d["Fecha"].apply(mes_key))
     .groupby("Mes")["Monto"]
@@ -111,32 +101,109 @@ otros_por_mes = (
     else pd.Series(dtype=float)
 )
 
-meses = sorted(set(ingresos_por_mes.index) | set(gerente_por_mes.index) | set(otros_por_mes.index))
+meses = sorted(
+    set(ingresos_por_mes.index)
+    | set(otros_por_mes.index)
+    | set(gerente_manual_por_mes.index)
+    | set(depositos_raw.keys())
+)
 
 filas_resumen = []
 for clave in meses:
-    ing = float(ingresos_por_mes.get(clave, 0.0))
-    ger = float(gerente_por_mes.get(clave, 0.0))
-    otros = float(otros_por_mes.get(clave, 0.0))
+    ingreso_mes = float(ingresos_por_mes.get(clave, 0.0))
+    depositado_mes = float(depositos_raw.get(clave, 0.0))
+    pago_gerente_mes = depositado_mes * db.PORCENTAJE_GERENTE + float(gerente_manual_por_mes.get(clave, 0.0))
+    otros_mes = float(otros_por_mes.get(clave, 0.0))
     filas_resumen.append(
         {
             "Mes": mes_label(clave),
-            "Pagos de Alquiler": ing,
-            "Pago del Gerente": ger,
-            "Otros Gastos": otros,
-            "Balance del Mes": ing - ger - otros,
+            "Pagos de Alquiler": ingreso_mes,
+            "Monto Depositado": depositado_mes,
+            "Pago al Gerente": pago_gerente_mes,
+            "Otros Gastos": otros_mes,
+            "Balance del Mes": ingreso_mes - pago_gerente_mes - otros_mes,
         }
     )
 
 resumen_mensual_df = pd.DataFrame(
-    filas_resumen, columns=["Mes", "Pagos de Alquiler", "Pago del Gerente", "Otros Gastos", "Balance del Mes"]
+    filas_resumen,
+    columns=["Mes", "Pagos de Alquiler", "Monto Depositado", "Pago al Gerente", "Otros Gastos", "Balance del Mes"],
+)
+
+# --- Overall totals (derived from the monthly breakdown above) ------------
+total_ingresos = ingresos_df["Monto"].sum() if not ingresos_df.empty else 0.0
+total_gerente = resumen_mensual_df["Pago al Gerente"].sum() if not resumen_mensual_df.empty else 0.0
+total_otros_gastos = resumen_mensual_df["Otros Gastos"].sum() if not resumen_mensual_df.empty else 0.0
+total_gastos = total_gerente + total_otros_gastos
+neto = total_ingresos - total_gastos
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Total pagos de alquiler", money(total_ingresos))
+c2.metric("Total gastos", money(total_gastos))
+c3.metric("Balance neto (despues de todos los gastos)", money(neto))
+
+c4, c5 = st.columns(2)
+c4.metric(f"De los cuales: Pago a {db.MANAGER_NAME}", money(total_gerente))
+c5.metric("De los cuales: Otros gastos", money(total_otros_gastos))
+
+st.divider()
+
+# --- Deposito bancario mensual -> pago automatico al gerente --------------
+st.subheader(f"Deposito bancario mensual y pago a {db.MANAGER_NAME}")
+st.caption(
+    f"El pago de {db.MANAGER_NAME} se calcula automaticamente: "
+    f"{int(db.PORCENTAJE_GERENTE * 100)}% de lo que se deposito en el banco "
+    "ese mes. Registra aqui el monto depositado de cada mes."
+)
+
+meses_opciones = sorted(rango_meses(atras=12, adelante=2), reverse=True)
+mes_actual_key = mes_key(date.today().isoformat())
+indice_default = meses_opciones.index(mes_actual_key) if mes_actual_key in meses_opciones else 0
+
+col_dep1, col_dep2 = st.columns(2)
+with col_dep1:
+    mes_seleccionado = st.selectbox(
+        "Mes", options=meses_opciones, index=indice_default, format_func=mes_label, key="mes_deposito_sel"
+    )
+with col_dep2:
+    monto_deposito = st.number_input(
+        "Monto depositado en el banco ese mes",
+        min_value=0.0,
+        step=100.0,
+        format="%.2f",
+        value=float(depositos_raw.get(mes_seleccionado, 0.0)),
+        key=f"monto_deposito_{mes_seleccionado}",
+    )
+
+pago_gerente_preview = monto_deposito * db.PORCENTAJE_GERENTE
+st.metric(
+    f"Pago a {db.MANAGER_NAME} ({int(db.PORCENTAJE_GERENTE * 100)}% de {mes_label(mes_seleccionado)})",
+    money(pago_gerente_preview),
+)
+
+if st.button("Guardar deposito de este mes", type="primary"):
+    db.upsert_deposito(mes_seleccionado, float(monto_deposito))
+    st.success(
+        f"Deposito de {mes_label(mes_seleccionado)} guardado: {money(monto_deposito)}. "
+        f"Pago a {db.MANAGER_NAME}: {money(pago_gerente_preview)}."
+    )
+    st.rerun()
+
+st.divider()
+
+# --- Resumen mensual: total por mes y gran total al final -----------------
+st.subheader("Resumen mensual")
+st.caption(
+    "Pagos de alquiler, monto depositado, pago al gerente y otros gastos "
+    "por mes. La ultima fila es el gran total acumulado."
 )
 
 if not resumen_mensual_df.empty:
     fila_total = {
         "Mes": "Total general",
         "Pagos de Alquiler": resumen_mensual_df["Pagos de Alquiler"].sum(),
-        "Pago del Gerente": resumen_mensual_df["Pago del Gerente"].sum(),
+        "Monto Depositado": resumen_mensual_df["Monto Depositado"].sum(),
+        "Pago al Gerente": resumen_mensual_df["Pago al Gerente"].sum(),
         "Otros Gastos": resumen_mensual_df["Otros Gastos"].sum(),
         "Balance del Mes": resumen_mensual_df["Balance del Mes"].sum(),
     }
@@ -144,12 +211,12 @@ if not resumen_mensual_df.empty:
         [resumen_mensual_df, pd.DataFrame([fila_total])], ignore_index=True
     )
     resumen_show = resumen_mensual_completo.copy()
-    for col in ["Pagos de Alquiler", "Pago del Gerente", "Otros Gastos", "Balance del Mes"]:
+    for col in ["Pagos de Alquiler", "Monto Depositado", "Pago al Gerente", "Otros Gastos", "Balance del Mes"]:
         resumen_show[col] = resumen_show[col].apply(money)
     st.dataframe(resumen_show, use_container_width=True, hide_index=True)
 else:
     resumen_mensual_completo = resumen_mensual_df
-    st.info("Aun no hay pagos ni gastos registrados para calcular un resumen mensual.")
+    st.info("Aun no hay pagos, gastos ni depositos registrados para calcular un resumen mensual.")
 
 st.divider()
 
