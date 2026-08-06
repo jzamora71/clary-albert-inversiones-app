@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, fecha_dmy, init_session_state, money
+from utils import COMPANY_NAME, fecha_dmy, init_session_state, money, money_input
 
 st.set_page_config(page_title=f"Gastos - {COMPANY_NAME}", page_icon="📤", layout="wide")
 
@@ -44,13 +44,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     gasto_concepto = st.text_input("Descripcion de gastos", key="gasto_concepto")
 with col2:
-    gasto_monto = st.number_input(
-        "Monto de gastos",
-        min_value=0.0,
-        step=100.0,
-        format="%.2f",
-        key="gasto_monto",
-    )
+    gasto_monto = money_input("Monto de gastos", key="gasto_monto")
 with col3:
     gasto_fecha = st.date_input("Fecha de gastos (dia/mes/año)", value=date.today(), key="gasto_fecha")
 

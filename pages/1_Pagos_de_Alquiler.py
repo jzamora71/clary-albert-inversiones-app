@@ -28,6 +28,7 @@ from utils import (
     mes_key,
     mes_label,
     money,
+    money_input,
     rango_meses,
 )
 
@@ -94,13 +95,7 @@ col3, col4 = st.columns(2)
 with col3:
     fecha_pago = st.date_input("Fecha de pago (dia/mes/año)", value=date.today(), key="pago_fecha")
 with col4:
-    monto_pago = st.number_input(
-        "Monto pagado",
-        min_value=0.0,
-        step=100.0,
-        format="%.2f",
-        key=f"pago_monto_{apartamento}",
-    )
+    monto_pago = money_input("Monto pagado", key=f"pago_monto_{apartamento}")
 
 if st.button("Registrar pago", type="primary"):
     if not nombre_inquilino.strip():

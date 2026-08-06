@@ -101,6 +101,39 @@ def money_pdf(x):
     return f"RD$ {value:,.2f}"
 
 
+def money_input(label, key, default=0.0, help=None):
+    """Amount field that starts empty (showing a faint '0.00' placeholder
+    instead of a real 0) and, once you finish typing and move to the next
+    field, reformats what you typed with thousands separators -- e.g.
+    typing 9000 becomes 9,000.00. Always returns a plain float (0.0 if the
+    box is left empty or has stray characters), so the rest of the app
+    never has to think about text parsing.
+
+    `default` pre-fills the field (formatted) -- used on the Reporte page
+    so a previously saved deposit shows up already filled in.
+    """
+    if key not in st.session_state:
+        st.session_state[key] = f"{default:,.2f}" if default else ""
+
+    raw = st.session_state[key]
+    cleaned = raw.replace("RD$", "").replace(",", "").replace(" ", "").strip()
+    value = 0.0
+    if cleaned:
+        try:
+            value = float(cleaned)
+        except ValueError:
+            value = 0.0
+        else:
+            if value < 0:
+                value = 0.0
+            formatted = f"{value:,.2f}"
+            if raw != formatted:
+                st.session_state[key] = formatted
+
+    st.text_input(label, key=key, placeholder="0.00", help=help)
+    return value
+
+
 def sanitize_text(text):
     if text is None:
         return ""

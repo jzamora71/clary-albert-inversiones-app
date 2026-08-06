@@ -34,6 +34,7 @@ from utils import (
     mes_key,
     mes_label,
     money,
+    money_input,
     rango_meses,
 )
 
@@ -227,13 +228,10 @@ with col_dep1:
         "Mes", options=meses_opciones, index=indice_default, format_func=mes_label, key="mes_deposito_sel"
     )
 with col_dep2:
-    monto_deposito = st.number_input(
+    monto_deposito = money_input(
         "Monto depositado en el banco ese mes",
-        min_value=0.0,
-        step=100.0,
-        format="%.2f",
-        value=float(depositos_raw.get(mes_seleccionado, 0.0)),
         key=f"monto_deposito_{mes_seleccionado}",
+        default=float(depositos_raw.get(mes_seleccionado, 0.0)),
     )
 
 pago_gerente_preview = monto_deposito * db.PORCENTAJE_GERENTE
