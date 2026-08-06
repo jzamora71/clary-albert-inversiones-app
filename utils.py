@@ -345,3 +345,4 @@ def build_pagos_pdf(empresa, fecha_reporte, titulo_periodo, pagos_df, total_peri
         pdf_bytes = pdf_bytes.encode("latin-1")
 
     return pdf_bytes
+
