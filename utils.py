@@ -369,3 +369,4 @@ def build_pagos_pdf(empresa, fecha_reporte, titulo_periodo, pagos_df, total_peri
 
     return pdf_bytes
 
+
