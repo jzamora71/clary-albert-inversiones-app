@@ -31,6 +31,7 @@ from utils import (
     build_pdf,
     fecha_dmy,
     init_session_state,
+    kpi_card,
     mes_key,
     mes_label,
     money,
@@ -200,13 +201,18 @@ else:
     titulo_vista = mes_label(mes_vista)
 
 c1, c2, c3 = st.columns(3)
-c1.metric(f"Total pagos de alquiler ({titulo_vista})", money(total_ingresos_vista))
-c2.metric(f"Total gastos ({titulo_vista})", money(total_gastos_vista))
-c3.metric(f"Balance neto ({titulo_vista})", money(neto_vista))
+with c1:
+    kpi_card(f"Total pagos de alquiler ({titulo_vista})", money(total_ingresos_vista))
+with c2:
+    kpi_card(f"Total gastos ({titulo_vista})", money(total_gastos_vista), expense=True)
+with c3:
+    kpi_card(f"Balance neto ({titulo_vista})", money(neto_vista))
 
 c4, c5 = st.columns(2)
-c4.metric(f"De los cuales: Pago a {db.MANAGER_NAME} ({titulo_vista})", money(total_gerente_vista))
-c5.metric(f"De los cuales: Otros gastos ({titulo_vista})", money(total_otros_vista))
+with c4:
+    kpi_card(f"De los cuales: Pago a {db.MANAGER_NAME} ({titulo_vista})", money(total_gerente_vista), expense=True)
+with c5:
+    kpi_card(f"De los cuales: Otros gastos ({titulo_vista})", money(total_otros_vista), expense=True)
 
 st.divider()
 
@@ -235,9 +241,10 @@ with col_dep2:
     )
 
 pago_gerente_preview = monto_deposito * db.PORCENTAJE_GERENTE
-st.metric(
+kpi_card(
     f"Pago a {db.MANAGER_NAME} ({int(db.PORCENTAJE_GERENTE * 100)}% de {mes_label(mes_seleccionado)})",
     money(pago_gerente_preview),
+    expense=True,
 )
 
 if st.button("Guardar deposito de este mes", type="primary"):

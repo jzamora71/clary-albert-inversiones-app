@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, fecha_dmy, init_session_state, money, money_input
+from utils import COMPANY_NAME, fecha_dmy, init_session_state, kpi_card, money, money_input
 
 st.set_page_config(page_title=f"Gastos - {COMPANY_NAME}", page_icon="📤", layout="wide")
 
@@ -73,6 +73,6 @@ if gastos:
     gastos_show["Fecha"] = gastos_show["Fecha"].apply(fecha_dmy)
     gastos_show["Monto"] = gastos_show["Monto"].apply(money)
     st.dataframe(gastos_show, use_container_width=True, hide_index=True)
-    st.metric("Total gastos", money(gastos_df["Monto"].sum()))
+    kpi_card("Total gastos", money(gastos_df["Monto"].sum()), expense=True)
 else:
     st.info("Aun no hay gastos registrados.")

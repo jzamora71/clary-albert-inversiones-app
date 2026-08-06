@@ -134,6 +134,29 @@ def money_input(label, key, default=0.0, help=None):
     return value
 
 
+def kpi_card(label, value, expense=False):
+    """Compact, professionally-sized number card (replaces st.metric, whose
+    default value text is very large/oversized for this app). Income and
+    balance figures render in the normal dark text color; pass
+    expense=True for anything that represents money going out (gastos,
+    manager payment) so it renders in red -- makes it easy to see at a
+    glance what's being spent versus what's coming in.
+    """
+    color = "#B91C1C" if expense else "#28251D"
+    st.markdown(
+        f"""
+        <div style="border:1px solid #D4D1CA; border-radius:8px;
+                    padding:12px 16px; background:#F9F8F5; margin-bottom:8px;">
+            <div style="font-size:13px; color:#7A7974; margin-bottom:4px;
+                        line-height:1.3;">{label}</div>
+            <div style="font-size:22px; font-weight:700; color:{color};
+                        line-height:1.25;">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def sanitize_text(text):
     if text is None:
         return ""
