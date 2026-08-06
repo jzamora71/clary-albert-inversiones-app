@@ -164,10 +164,40 @@ if pagos:
     c2.metric("Total general de pagos (todos los meses)", money(total_general_pagos))
 
     if not pagos_vista_df.empty:
-        pagos_show = pagos_vista_df.drop(columns=["ID"]).copy()
-        pagos_show["Fecha"] = pagos_show["Fecha"].apply(fecha_dmy)
-        pagos_show["Monto"] = pagos_show["Monto"].apply(money)
-        st.dataframe(pagos_show, use_container_width=True, hide_index=True)
+        st.caption("Toca el icono 🗑️ junto a un pago para eliminarlo (por ejemplo, si tiene un error).")
+
+        header_cols = st.columns([0.8, 1.6, 1.3, 1.1, 1.3, 0.7])
+        for col, label in zip(header_cols, ["Apto", "Inquilino", "Telefono", "Fecha", "Monto", ""]):
+            col.markdown(f"**{label}**")
+
+        for r in pagos_vista_df.itertuples():
+            row_id = r.ID
+            with st.container(border=True):
+                row_cols = st.columns([0.8, 1.6, 1.3, 1.1, 1.3, 0.7])
+                row_cols[0].write(r.Apartamento)
+                row_cols[1].write(r.Inquilino)
+                row_cols[2].write(r.Telefono)
+                row_cols[3].write(fecha_dmy(r.Fecha))
+                row_cols[4].write(money(r.Monto))
+                if row_cols[5].button("🗑️", key=f"borrar_pago_{row_id}", help="Eliminar este pago"):
+                    st.session_state["confirmar_borrar_pago_id"] = row_id
+                    st.rerun()
+
+                if st.session_state.get("confirmar_borrar_pago_id") == row_id:
+                    st.warning(
+                        f"¿Seguro que deseas eliminar el pago de **{r.Inquilino}** "
+                        f"(Apto {r.Apartamento}) por **{money(r.Monto)}** del "
+                        f"{fecha_dmy(r.Fecha)}? Esta accion no se puede deshacer."
+                    )
+                    confirm_cols = st.columns(2)
+                    if confirm_cols[0].button("Si, eliminar", key=f"si_pago_{row_id}", type="primary"):
+                        db.delete_ingreso(row_id)
+                        st.session_state.pop("confirmar_borrar_pago_id", None)
+                        st.success("Pago eliminado.")
+                        st.rerun()
+                    if confirm_cols[1].button("Cancelar", key=f"no_pago_{row_id}"):
+                        st.session_state.pop("confirmar_borrar_pago_id", None)
+                        st.rerun()
 
         pdf_pagos_bytes = build_pagos_pdf(
             empresa=COMPANY_NAME,
@@ -187,33 +217,5 @@ if pagos:
         )
     else:
         st.info(f"No hay pagos de alquiler registrados en {titulo_vista_pagos}.")
-
-    # --- Corregir o eliminar un pago -------------------------------------
-    st.divider()
-    with st.expander("✏️ Corregir o eliminar un pago"):
-        st.caption(
-            "Si un pago se registro por error (monto equivocado, fecha "
-            "equivocada, duplicado, etc.), puedes eliminarlo aqui y "
-            "volver a registrarlo correctamente arriba."
-        )
-        opciones_pago = {
-            f"Apto {r.Apartamento} - {r.Inquilino} - {fecha_dmy(r.Fecha)} - {money(r.Monto)} (registro #{r.ID})": r.ID
-            for r in pagos_df.itertuples()
-        }
-        etiqueta_pago = st.selectbox(
-            "Selecciona el pago a eliminar", options=list(opciones_pago.keys()), key="pago_a_borrar"
-        )
-        confirmar_borrado_pago = st.checkbox(
-            "Confirmo que quiero eliminar este pago permanentemente", key="confirmar_borrado_pago"
-        )
-        if st.button(
-            "🗑️ Eliminar pago seleccionado",
-            disabled=not confirmar_borrado_pago,
-            key="btn_borrar_pago",
-        ):
-            db.delete_ingreso(opciones_pago[etiqueta_pago])
-            st.success("Pago eliminado.")
-            del st.session_state["confirmar_borrado_pago"]
-            st.rerun()
 else:
     st.info("Aun no hay pagos de alquiler registrados.")

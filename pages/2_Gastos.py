@@ -69,38 +69,41 @@ gastos = db.get_gastos()
 if gastos:
     gastos_df = pd.DataFrame(gastos)[["id", "categoria", "concepto", "fecha", "monto"]]
     gastos_df.columns = ["ID", "Tipo", "Concepto", "Fecha", "Monto"]
-    gastos_show = gastos_df.drop(columns=["ID"]).copy()
-    gastos_show["Fecha"] = gastos_show["Fecha"].apply(fecha_dmy)
-    gastos_show["Monto"] = gastos_show["Monto"].apply(money)
-    st.dataframe(gastos_show, use_container_width=True, hide_index=True)
-    kpi_card("Total gastos", money(gastos_df["Monto"].sum()), expense=True)
 
-    # --- Corregir o eliminar un gasto ---------------------------------
-    st.divider()
-    with st.expander("✏️ Corregir o eliminar un gasto"):
-        st.caption(
-            "Si un gasto se registro por error (monto equivocado, fecha "
-            "equivocada, duplicado, etc.), puedes eliminarlo aqui y "
-            "volver a registrarlo correctamente arriba."
-        )
-        opciones_gasto = {
-            f"{r.Concepto} - {fecha_dmy(r.Fecha)} - {money(r.Monto)} (registro #{r.ID})": r.ID
-            for r in gastos_df.itertuples()
-        }
-        etiqueta_gasto = st.selectbox(
-            "Selecciona el gasto a eliminar", options=list(opciones_gasto.keys()), key="gasto_a_borrar"
-        )
-        confirmar_borrado_gasto = st.checkbox(
-            "Confirmo que quiero eliminar este gasto permanentemente", key="confirmar_borrado_gasto"
-        )
-        if st.button(
-            "🗑️ Eliminar gasto seleccionado",
-            disabled=not confirmar_borrado_gasto,
-            key="btn_borrar_gasto",
-        ):
-            db.delete_gasto(opciones_gasto[etiqueta_gasto])
-            st.success("Gasto eliminado.")
-            del st.session_state["confirmar_borrado_gasto"]
-            st.rerun()
+    st.caption("Toca el icono 🗑️ junto a un gasto para eliminarlo (por ejemplo, si tiene un error).")
+
+    header_cols = st.columns([1.3, 2.2, 1.2, 1.3, 0.7])
+    for col, label in zip(header_cols, ["Tipo", "Concepto", "Fecha", "Monto", ""]):
+        col.markdown(f"**{label}**")
+
+    for r in gastos_df.itertuples():
+        row_id = r.ID
+        with st.container(border=True):
+            row_cols = st.columns([1.3, 2.2, 1.2, 1.3, 0.7])
+            row_cols[0].write(r.Tipo)
+            row_cols[1].write(r.Concepto)
+            row_cols[2].write(fecha_dmy(r.Fecha))
+            row_cols[3].write(money(r.Monto))
+            if row_cols[4].button("🗑️", key=f"borrar_gasto_{row_id}", help="Eliminar este gasto"):
+                st.session_state["confirmar_borrar_gasto_id"] = row_id
+                st.rerun()
+
+            if st.session_state.get("confirmar_borrar_gasto_id") == row_id:
+                st.warning(
+                    f"¿Seguro que deseas eliminar el gasto **{r.Concepto}** "
+                    f"por **{money(r.Monto)}** del {fecha_dmy(r.Fecha)}? "
+                    "Esta accion no se puede deshacer."
+                )
+                confirm_cols = st.columns(2)
+                if confirm_cols[0].button("Si, eliminar", key=f"si_gasto_{row_id}", type="primary"):
+                    db.delete_gasto(row_id)
+                    st.session_state.pop("confirmar_borrar_gasto_id", None)
+                    st.success("Gasto eliminado.")
+                    st.rerun()
+                if confirm_cols[1].button("Cancelar", key=f"no_gasto_{row_id}"):
+                    st.session_state.pop("confirmar_borrar_gasto_id", None)
+                    st.rerun()
+
+    kpi_card("Total gastos", money(gastos_df["Monto"].sum()), expense=True)
 else:
     st.info("Aun no hay gastos registrados.")
