@@ -123,8 +123,8 @@ st.subheader("Historial de pagos")
 
 pagos = db.get_pagos_alquiler()
 if pagos:
-    pagos_df = pd.DataFrame(pagos)[["apartamento", "nombre", "telefono", "fecha", "monto"]]
-    pagos_df.columns = ["Apartamento", "Inquilino", "Telefono", "Fecha", "Monto"]
+    pagos_df = pd.DataFrame(pagos)[["id", "apartamento", "nombre", "telefono", "fecha", "monto"]]
+    pagos_df.columns = ["ID", "Apartamento", "Inquilino", "Telefono", "Fecha", "Monto"]
 
     # Selector de mes a mostrar: por defecto solo el mes actual, con la
     # opcion de ver todos los meses juntos si se necesita. Esto controla el
@@ -164,7 +164,7 @@ if pagos:
     c2.metric("Total general de pagos (todos los meses)", money(total_general_pagos))
 
     if not pagos_vista_df.empty:
-        pagos_show = pagos_vista_df.copy()
+        pagos_show = pagos_vista_df.drop(columns=["ID"]).copy()
         pagos_show["Fecha"] = pagos_show["Fecha"].apply(fecha_dmy)
         pagos_show["Monto"] = pagos_show["Monto"].apply(money)
         st.dataframe(pagos_show, use_container_width=True, hide_index=True)
@@ -187,5 +187,33 @@ if pagos:
         )
     else:
         st.info(f"No hay pagos de alquiler registrados en {titulo_vista_pagos}.")
+
+    # --- Corregir o eliminar un pago -------------------------------------
+    st.divider()
+    with st.expander("✏️ Corregir o eliminar un pago"):
+        st.caption(
+            "Si un pago se registro por error (monto equivocado, fecha "
+            "equivocada, duplicado, etc.), puedes eliminarlo aqui y "
+            "volver a registrarlo correctamente arriba."
+        )
+        opciones_pago = {
+            f"Apto {r.Apartamento} - {r.Inquilino} - {fecha_dmy(r.Fecha)} - {money(r.Monto)} (registro #{r.ID})": r.ID
+            for r in pagos_df.itertuples()
+        }
+        etiqueta_pago = st.selectbox(
+            "Selecciona el pago a eliminar", options=list(opciones_pago.keys()), key="pago_a_borrar"
+        )
+        confirmar_borrado_pago = st.checkbox(
+            "Confirmo que quiero eliminar este pago permanentemente", key="confirmar_borrado_pago"
+        )
+        if st.button(
+            "🗑️ Eliminar pago seleccionado",
+            disabled=not confirmar_borrado_pago,
+            key="btn_borrar_pago",
+        ):
+            db.delete_ingreso(opciones_pago[etiqueta_pago])
+            st.success("Pago eliminado.")
+            del st.session_state["confirmar_borrado_pago"]
+            st.rerun()
 else:
     st.info("Aun no hay pagos de alquiler registrados.")
