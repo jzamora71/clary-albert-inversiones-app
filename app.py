@@ -47,6 +47,30 @@ st.markdown(
         padding: 15px;
         box-shadow: 0px 2px 6px rgba(31, 78, 121, 0.08);
     }
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+    div[data-testid="stMetric"] label {
+        color: #34608f !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"] p {
+        color: #34608f !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        width: auto !important;
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"],
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] p {
+        color: #1f4e79 !important;
+        font-size: 22px !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: break-word !important;
+        width: auto !important;
+    }
     .stButton>button {
         background-color: #1f4e79;
         color: #ffffff;
@@ -58,6 +82,9 @@ st.markdown(
     .stButton>button:hover {
         background-color: #163a5c;
         color: #ffffff;
+    }
+    div[data-testid="stCaptionContainer"] {
+        color: #34608f !important;
     }
     </style>
     """,
