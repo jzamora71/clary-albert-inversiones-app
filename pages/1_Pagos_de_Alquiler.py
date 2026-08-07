@@ -130,44 +130,74 @@ if st.button("Registrar pago", type="primary"):
 
 st.divider()
 
-# --- Historial de pagos -----------------------------------------------------
-st.subheader("Historial de pagos")
-
+# --- Apartamentos pendientes de pago -----------------------------------------
 pagos = db.get_pagos_alquiler()
 if pagos:
     pagos_df = pd.DataFrame(pagos)[["id", "apartamento", "nombre", "telefono", "fecha", "monto", "pendiente"]]
     pagos_df.columns = ["ID", "Apartamento", "Inquilino", "Telefono", "Fecha", "Monto", "Pendiente"]
+else:
+    pagos_df = pd.DataFrame(columns=["ID", "Apartamento", "Inquilino", "Telefono", "Fecha", "Monto", "Pendiente"])
 
-    # Selector de mes a mostrar: por defecto solo el mes actual, con la
-    # opcion de ver todos los meses juntos si se necesita. Esto controla el
-    # cuadro de total y la tabla de abajo, y tambien el PDF para imprimir.
-    mes_actual = mes_key(date.today().isoformat())
-    meses_con_datos = set(pagos_df["Fecha"].apply(mes_key))
-    meses_opciones = sorted(
-        meses_con_datos | set(rango_meses(atras=12, adelante=2)) | {mes_actual}, reverse=True
-    )
-    opciones_selector = ["TODOS"] + meses_opciones
-    indice_default = opciones_selector.index(mes_actual) if mes_actual in opciones_selector else 0
+# Selector de mes a mostrar: por defecto solo el mes actual, con la opcion de
+# ver todos los meses juntos si se necesita. Controla tanto la lista de
+# pendientes de aqui abajo como el Historial de pagos mas abajo.
+mes_actual = mes_key(date.today().isoformat())
+meses_con_datos = set(pagos_df["Fecha"].apply(mes_key)) if not pagos_df.empty else set()
+meses_opciones = sorted(
+    meses_con_datos | set(rango_meses(atras=12, adelante=2)) | {mes_actual}, reverse=True
+)
+opciones_selector = ["TODOS"] + meses_opciones
+indice_default = opciones_selector.index(mes_actual) if mes_actual in opciones_selector else 0
 
-    mes_vista_pagos = st.selectbox(
-        "Mes a mostrar",
-        options=opciones_selector,
-        index=indice_default,
-        format_func=lambda clave: "Todos los meses" if clave == "TODOS" else mes_label(clave),
-        key="pagos_mes_vista",
-    )
-    st.caption(
-        "El total y la tabla de abajo muestran solo el mes seleccionado. "
-        "Elige 'Todos los meses' para ver el historial completo."
-    )
+st.subheader("Apartamentos pendientes de pago")
+mes_vista_pagos = st.selectbox(
+    "Mes o fecha a revisar",
+    options=opciones_selector,
+    index=indice_default,
+    format_func=lambda clave: "Todos los meses" if clave == "TODOS" else mes_label(clave),
+    key="pagos_mes_vista",
+)
+st.caption(
+    "Muestra los apartamentos que aun no tienen un pago registrado en el mes "
+    "elegido. La lista se actualiza sola a medida que registras pagos arriba, "
+    "y tambien controla el total y la tabla del Historial de pagos."
+)
 
-    if mes_vista_pagos == "TODOS":
-        pagos_vista_df = pagos_df
-        titulo_vista_pagos = "Todos los meses"
+if mes_vista_pagos == "TODOS":
+    pagos_vista_df = pagos_df
+    titulo_vista_pagos = "Todos los meses"
+else:
+    pagos_vista_df = (
+        pagos_df[pagos_df["Fecha"].apply(mes_key) == mes_vista_pagos] if not pagos_df.empty else pagos_df
+    )
+    titulo_vista_pagos = mes_label(mes_vista_pagos)
+
+if mes_vista_pagos == "TODOS":
+    st.info("Elige un mes especifico (no 'Todos los meses') para ver quien esta pendiente de pago.")
+else:
+    apartamentos_pagados = (
+        set(pagos_vista_df["Apartamento"].astype(int).unique()) if not pagos_vista_df.empty else set()
+    )
+    todos_los_apartamentos = set(range(1, db.NUM_APARTAMENTOS + 1))
+    apartamentos_pendientes = sorted(todos_los_apartamentos - apartamentos_pagados)
+
+    if apartamentos_pendientes:
+        directorio_nombres = {row["apartamento"]: row["nombre"] for row in db.get_inquilinos()}
+        st.warning(
+            f"⚠️ {len(apartamentos_pendientes)} apartamento(s) pendiente(s) de pago en {titulo_vista_pagos}:"
+        )
+        for i, apto_pend in enumerate(apartamentos_pendientes, start=1):
+            nombre_pend = directorio_nombres.get(apto_pend, "") or "(sin nombre asignado)"
+            st.write(f"{i}. Apartamento {apto_pend} — {nombre_pend}")
     else:
-        pagos_vista_df = pagos_df[pagos_df["Fecha"].apply(mes_key) == mes_vista_pagos]
-        titulo_vista_pagos = mes_label(mes_vista_pagos)
+        st.success(f"✅ Los {db.NUM_APARTAMENTOS} apartamentos ya pagaron en {titulo_vista_pagos}.")
 
+st.divider()
+
+# --- Historial de pagos -----------------------------------------------------
+st.subheader("Historial de pagos")
+
+if pagos:
     total_vista_pagos = pagos_vista_df["Monto"].sum()
     total_general_pagos = pagos_df["Monto"].sum()
 
@@ -235,3 +265,4 @@ if pagos:
         st.info(f"No hay pagos de alquiler registrados en {titulo_vista_pagos}.")
 else:
     st.info("Aun no hay pagos de alquiler registrados.")
+
