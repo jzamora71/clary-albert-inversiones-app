@@ -31,12 +31,6 @@ st.page_link("app.py", label="🏠 Volver al inicio", icon=None)
 
 st.title("📤 Gastos")
 st.caption(f"{COMPANY_NAME} - Registro de gastos (guardado permanentemente)")
-st.info(
-    f"El pago del gerente **{db.MANAGER_NAME}** ya no se registra aqui -- se "
-    f"calcula automaticamente como el {int(db.PORCENTAJE_GERENTE * 100)}% del "
-    "deposito bancario del mes, en la pagina **Reporte**. Aqui solo se "
-    "registran otros gastos (reparaciones, mantenimiento, etc.)."
-)
 
 st.subheader("Agregar gastos")
 

@@ -195,6 +195,9 @@ def build_pdf(
     total_ingresos_periodo=None,
     periodo_label=None,
     anio_ytd=None,
+    total_gerente=None,
+    total_otros=None,
+    manager_name="",
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -321,6 +324,26 @@ def build_pdf(
             pdf.cell(29, 8, money_pdf(row[gerente_col]), border=1)
             pdf.cell(29, 8, money_pdf(row["Otros Gastos"]), border=1)
             pdf.cell(29 if has_depositado else 34, 8, money_pdf(row["Balance del Mes"]), border=1, ln=True)
+
+    if anio_ytd is not None:
+        pdf.ln(8)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, sanitize_text(f"Estado de Resultados (Ano {anio_ytd} hasta la fecha)"), ln=True)
+
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 7, sanitize_text(f"Ingresos por alquiler: {money_pdf(total_ingresos)}"), ln=True)
+        pdf.ln(1)
+        pdf.cell(0, 7, "Gastos:", ln=True)
+        if total_gerente is not None:
+            etiqueta_gerente = f"Pago a {manager_name}" if manager_name else "Pago al gerente"
+            pdf.cell(0, 7, sanitize_text(f"   {etiqueta_gerente}: {money_pdf(total_gerente)}"), ln=True)
+        if total_otros is not None:
+            pdf.cell(0, 7, sanitize_text(f"   Otros gastos: {money_pdf(total_otros)}"), ln=True)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, sanitize_text(f"   Total de gastos: {money_pdf(total_gastos)}"), ln=True)
+        pdf.ln(1)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, sanitize_text(f"Utilidad neta: {money_pdf(neto)}"), ln=True)
 
     pdf_bytes = pdf.output(dest="S")
     if isinstance(pdf_bytes, bytearray):

@@ -358,6 +358,9 @@ pdf_bytes = build_pdf(
     total_ingresos_periodo=total_ingresos_periodo,
     periodo_label=periodo_label,
     anio_ytd=anio_ytd,
+    total_gerente=gerente_ytd,
+    total_otros=otros_ytd,
+    manager_name=db.MANAGER_NAME,
 )
 
 sufijo_archivo = "todos_los_meses" if ver_todos_los_meses else mes_vista
