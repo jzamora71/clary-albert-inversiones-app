@@ -190,6 +190,8 @@ def build_pdf(
     total_gastos,
     neto,
     resumen_mensual_df=None,
+    pendientes_df=None,
+    total_pendiente=0.0,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -212,40 +214,38 @@ def build_pdf(
     pdf.ln(6)
 
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, "Pagos de Alquiler", ln=True)
+    pdf.cell(0, 8, "Pendientes por Pagar", ln=True)
 
-    has_apartamento = "Apartamento" in ingresos_df.columns
+    tiene_pendientes = pendientes_df is not None and not pendientes_df.empty
 
-    pdf.set_font("Helvetica", "B", 10)
-    if has_apartamento:
-        pdf.cell(20, 8, "Apto", border=1)
-        pdf.cell(55, 8, "Inquilino", border=1)
-        pdf.cell(35, 8, "Telefono", border=1)
+    if tiene_pendientes:
+        pdf.set_text_color(200, 0, 0)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(25, 8, "Apto", border=1)
+        pdf.cell(75, 8, "Inquilino", border=1)
         pdf.cell(35, 8, "Fecha", border=1)
-        pdf.cell(35, 8, "Monto", border=1, ln=True)
-    else:
-        pdf.cell(95, 8, "Concepto", border=1)
-        pdf.cell(40, 8, "Fecha", border=1)
-        pdf.cell(45, 8, "Monto", border=1, ln=True)
+        pdf.cell(40, 8, "Pendiente", border=1, ln=True)
 
-    pdf.set_font("Helvetica", "", 10)
-    for _, row in ingresos_df.iterrows():
-        fecha_txt = fecha_dmy(row["Fecha"])
-        monto_txt = money_pdf(row["Monto"])
-        if has_apartamento:
+        pdf.set_font("Helvetica", "", 10)
+        for _, row in pendientes_df.iterrows():
             apto_txt = str(row["Apartamento"]) if str(row["Apartamento"]) != "nan" else ""
-            inquilino_txt = sanitize_text(str(row["Concepto"]))[:28]
-            telefono_txt = sanitize_text(str(row.get("Telefono", "")))[:18]
-            pdf.cell(20, 8, apto_txt, border=1)
-            pdf.cell(55, 8, inquilino_txt, border=1)
-            pdf.cell(35, 8, telefono_txt, border=1)
+            inquilino_txt = sanitize_text(str(row["Concepto"]))[:38]
+            fecha_txt = fecha_dmy(row["Fecha"])
+            pendiente_txt = money_pdf(row["Pendiente"])
+            pdf.cell(25, 8, apto_txt, border=1)
+            pdf.cell(75, 8, inquilino_txt, border=1)
             pdf.cell(35, 8, fecha_txt, border=1)
-            pdf.cell(35, 8, monto_txt, border=1, ln=True)
-        else:
-            concepto = sanitize_text(str(row["Concepto"]))[:45]
-            pdf.cell(95, 8, concepto, border=1)
-            pdf.cell(40, 8, fecha_txt, border=1)
-            pdf.cell(45, 8, monto_txt, border=1, ln=True)
+            pdf.cell(40, 8, pendiente_txt, border=1, ln=True)
+
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, sanitize_text(f"Total Pendiente por Pagar: {money_pdf(total_pendiente)}"), ln=True)
+        pdf.set_text_color(0, 0, 0)
+    else:
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 8, "No hay pagos pendientes.", ln=True)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, sanitize_text(f"Total Pendiente por Pagar: {money_pdf(total_pendiente)}"), ln=True)
 
     pdf.ln(6)
 

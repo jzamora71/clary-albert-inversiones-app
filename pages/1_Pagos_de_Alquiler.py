@@ -91,11 +91,14 @@ with col2:
         key=f"pago_telefono_{apartamento}",
     )
 
-col3, col4 = st.columns(2)
+col3, col4, col5 = st.columns(3)
 with col3:
     fecha_pago = st.date_input("Fecha de pago (dia/mes/año)", value=date.today(), key="pago_fecha")
 with col4:
     monto_pago = money_input("Monto pagado", key=f"pago_monto_{apartamento}")
+with col5:
+    pendiente_pago = money_input("Pendiente por pagar", key=f"pago_pendiente_{apartamento}")
+    st.caption("Deja en 0.00 si el inquilino pago todo.")
 
 if st.button("Registrar pago", type="primary"):
     if not nombre_inquilino.strip():
@@ -109,11 +112,13 @@ if st.button("Registrar pago", type="primary"):
             telefono=telefono_inquilino.strip(),
             fecha=fecha_pago.isoformat(),
             monto=float(monto_pago),
+            pendiente=float(pendiente_pago),
         )
         st.success(f"Pago del apartamento {apartamento} registrado y guardado.")
-        # Limpiar el monto para que el siguiente pago (mismo apartamento u
-        # otro) siempre empiece en blanco/0, en vez de mostrar este monto.
+        # Limpiar los montos para que el siguiente pago (mismo apartamento u
+        # otro) siempre empiece en blanco/0, en vez de mostrar estos valores.
         del st.session_state[f"pago_monto_{apartamento}"]
+        del st.session_state[f"pago_pendiente_{apartamento}"]
         st.rerun()
 
 st.divider()
@@ -123,8 +128,8 @@ st.subheader("Historial de pagos")
 
 pagos = db.get_pagos_alquiler()
 if pagos:
-    pagos_df = pd.DataFrame(pagos)[["id", "apartamento", "nombre", "telefono", "fecha", "monto"]]
-    pagos_df.columns = ["ID", "Apartamento", "Inquilino", "Telefono", "Fecha", "Monto"]
+    pagos_df = pd.DataFrame(pagos)[["id", "apartamento", "nombre", "telefono", "fecha", "monto", "pendiente"]]
+    pagos_df.columns = ["ID", "Apartamento", "Inquilino", "Telefono", "Fecha", "Monto", "Pendiente"]
 
     # Selector de mes a mostrar: por defecto solo el mes actual, con la
     # opcion de ver todos los meses juntos si se necesita. Esto controla el
@@ -166,20 +171,24 @@ if pagos:
     if not pagos_vista_df.empty:
         st.caption("Toca el icono 🗑️ junto a un pago para eliminarlo (por ejemplo, si tiene un error).")
 
-        header_cols = st.columns([0.8, 1.6, 1.3, 1.1, 1.3, 0.7])
-        for col, label in zip(header_cols, ["Apto", "Inquilino", "Telefono", "Fecha", "Monto", ""]):
+        header_cols = st.columns([0.7, 1.4, 1.1, 1.0, 1.1, 1.1, 0.6])
+        for col, label in zip(header_cols, ["Apto", "Inquilino", "Telefono", "Fecha", "Monto", "Pendiente", ""]):
             col.markdown(f"**{label}**")
 
         for r in pagos_vista_df.itertuples():
             row_id = r.ID
             with st.container(border=True):
-                row_cols = st.columns([0.8, 1.6, 1.3, 1.1, 1.3, 0.7])
+                row_cols = st.columns([0.7, 1.4, 1.1, 1.0, 1.1, 1.1, 0.6])
                 row_cols[0].write(r.Apartamento)
                 row_cols[1].write(r.Inquilino)
                 row_cols[2].write(r.Telefono)
                 row_cols[3].write(fecha_dmy(r.Fecha))
                 row_cols[4].write(money(r.Monto))
-                if row_cols[5].button("🗑️", key=f"borrar_pago_{row_id}", help="Eliminar este pago"):
+                if r.Pendiente and float(r.Pendiente) > 0:
+                    row_cols[5].markdown(f":red[{money(r.Pendiente)}]")
+                else:
+                    row_cols[5].write("—")
+                if row_cols[6].button("🗑️", key=f"borrar_pago_{row_id}", help="Eliminar este pago"):
                     st.session_state["confirmar_borrar_pago_id"] = row_id
                     st.rerun()
 

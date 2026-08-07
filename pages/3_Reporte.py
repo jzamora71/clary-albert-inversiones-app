@@ -58,17 +58,18 @@ gastos_raw = db.get_gastos()
 depositos_raw = {row["mes"]: float(row["monto"]) for row in db.get_depositos()}
 
 ingresos_df = (
-    pd.DataFrame(pagos_raw)[["apartamento", "nombre", "telefono", "fecha", "monto"]].rename(
+    pd.DataFrame(pagos_raw)[["apartamento", "nombre", "telefono", "fecha", "monto", "pendiente"]].rename(
         columns={
             "apartamento": "Apartamento",
             "nombre": "Concepto",
             "telefono": "Telefono",
             "fecha": "Fecha",
             "monto": "Monto",
+            "pendiente": "Pendiente",
         }
     )
     if pagos_raw
-    else pd.DataFrame(columns=["Apartamento", "Concepto", "Telefono", "Fecha", "Monto"])
+    else pd.DataFrame(columns=["Apartamento", "Concepto", "Telefono", "Fecha", "Monto", "Pendiente"])
 )
 gastos_df = (
     pd.DataFrame(gastos_raw)[["categoria", "concepto", "fecha", "monto"]].rename(
@@ -314,6 +315,13 @@ with col_b:
 
 st.divider()
 
+pendientes_vista_df = (
+    ingresos_vista_df[ingresos_vista_df["Pendiente"] > 0]
+    if not ingresos_vista_df.empty
+    else ingresos_vista_df
+)
+total_pendiente_vista = float(pendientes_vista_df["Pendiente"].sum()) if not pendientes_vista_df.empty else 0.0
+
 pdf_bytes = build_pdf(
     empresa=empresa,
     fecha_reporte=fecha_reporte,
@@ -323,6 +331,8 @@ pdf_bytes = build_pdf(
     total_gastos=total_gastos_vista,
     neto=neto_vista,
     resumen_mensual_df=resumen_mensual_completo,
+    pendientes_df=pendientes_vista_df,
+    total_pendiente=total_pendiente_vista,
 )
 
 sufijo_archivo = "todos_los_meses" if ver_todos_los_meses else mes_vista

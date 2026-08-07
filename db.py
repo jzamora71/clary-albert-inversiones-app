@@ -112,6 +112,7 @@ def init_db():
     with conn.session as s:
         _add_column_if_missing(s, "ingresos", "apartamento", "INTEGER")
         _add_column_if_missing(s, "ingresos", "telefono", "TEXT")
+        _add_column_if_missing(s, "ingresos", "pendiente", "REAL")
         _add_column_if_missing(s, "gastos", "categoria", "TEXT")
 
     # Make sure all 13 apartments exist in the tenant directory so the
@@ -224,16 +225,21 @@ def upsert_deposito(mes, monto):
 
 # --- Ingresos / pagos de alquiler ------------------------------------------
 
-def add_pago_alquiler(apartamento, nombre, telefono, fecha, monto):
-    """Register one tenant's rent payment for the given date/amount."""
+def add_pago_alquiler(apartamento, nombre, telefono, fecha, monto, pendiente=0.0):
+    """Register one tenant's rent payment for the given date/amount.
+
+    `pendiente` is however much of that period's rent is still owed (0 if
+    the tenant paid in full). It is saved alongside the payment so the
+    Reporte page can show who still owes money.
+    """
     conn = get_conn()
     with conn.session as s:
         s.execute(
             text(
-                "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono) "
-                "VALUES (:c, :f, :m, :a, :t)"
+                "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono, pendiente) "
+                "VALUES (:c, :f, :m, :a, :t, :p)"
             ),
-            {"c": nombre, "f": fecha, "m": monto, "a": apartamento, "t": telefono},
+            {"c": nombre, "f": fecha, "m": monto, "a": apartamento, "t": telefono, "p": pendiente or 0.0},
         )
         s.commit()
     # Keep the tenant directory in sync so next month's form is pre-filled.
@@ -272,7 +278,8 @@ def get_pagos_alquiler():
     """Rent payments with apartment number and contact number included."""
     conn = get_conn()
     df = conn.query(
-        "SELECT id, apartamento, concepto AS nombre, telefono, fecha, monto "
+        "SELECT id, apartamento, concepto AS nombre, telefono, fecha, monto, "
+        "COALESCE(pendiente, 0) AS pendiente "
         "FROM ingresos ORDER BY fecha DESC, id DESC",
         ttl=0,
     )
