@@ -227,7 +227,7 @@ def build_pdf(
             sanitize_text(f"Total pagos de alquiler ({periodo_label}): {money_pdf(total_ingresos_periodo)}"),
             ln=True,
         )
-    etiqueta_ytd = f" (Ano {anio_ytd} hasta la fecha)" if anio_ytd is not None else ""
+    etiqueta_ytd = f" (A\u00f1o {anio_ytd} hasta la fecha)" if anio_ytd is not None else ""
     pdf.cell(0, 7, f"Total pagos de alquiler{etiqueta_ytd}: {money_pdf(total_ingresos)}", ln=True)
     pdf.cell(0, 7, f"Total gastos{etiqueta_ytd}: {money_pdf(total_gastos)}", ln=True)
     pdf.cell(0, 7, f"Balance neto{etiqueta_ytd}: {money_pdf(neto)}", ln=True)
@@ -313,7 +313,7 @@ def build_pdf(
         pdf.cell(
             label_w + amount_w,
             10,
-            sanitize_text(f"  Estado de Resultados (Ano {anio_ytd} hasta la fecha)"),
+            f"  Estado de Resultados (A\u00f1o {anio_ytd} hasta la fecha)",
             fill=True,
             ln=True,
         )
