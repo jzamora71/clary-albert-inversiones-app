@@ -315,10 +315,12 @@ with col_b:
 
 st.divider()
 
+# La seccion de "Pendientes por Pagar" del PDF siempre muestra TODOS los
+# inquilinos que deben dinero, sin importar el mes seleccionado arriba --
+# quien debe dinero es un estado actual, no algo que deba desaparecer del
+# reporte solo porque se esta viendo un mes distinto.
 pendientes_vista_df = (
-    ingresos_vista_df[ingresos_vista_df["Pendiente"] > 0]
-    if not ingresos_vista_df.empty
-    else ingresos_vista_df
+    ingresos_df[ingresos_df["Pendiente"] > 0] if not ingresos_df.empty else ingresos_df
 )
 total_pendiente_vista = float(pendientes_vista_df["Pendiente"].sum()) if not pendientes_vista_df.empty else 0.0
 
