@@ -75,19 +75,26 @@ st.divider()
 st.subheader("Registrar pago de alquiler")
 
 apartamento = st.selectbox("Apartamento", options=list(range(1, db.NUM_APARTAMENTOS + 1)), key="pago_apartamento")
-inquilino_actual = db.get_inquilino(apartamento)
+
+# Cada vez que cambia el apartamento seleccionado (incluyendo la primera vez
+# que carga la pagina), volvemos a leer el directorio de inquilinos para que
+# el nombre y telefono siempre reflejen los datos guardados mas recientes,
+# en vez de quedarse con un valor vacio que Streamlit recordaba de antes.
+if st.session_state.get("pago_apartamento_prev") != apartamento:
+    inquilino_actual = db.get_inquilino(apartamento)
+    st.session_state[f"pago_nombre_{apartamento}"] = inquilino_actual["nombre"] or ""
+    st.session_state[f"pago_telefono_{apartamento}"] = inquilino_actual["telefono"] or ""
+    st.session_state["pago_apartamento_prev"] = apartamento
 
 col1, col2 = st.columns(2)
 with col1:
     nombre_inquilino = st.text_input(
         "Nombre del inquilino",
-        value=inquilino_actual["nombre"] or "",
         key=f"pago_nombre_{apartamento}",
     )
 with col2:
     telefono_inquilino = st.text_input(
         "Numero de contacto",
-        value=inquilino_actual["telefono"] or "",
         key=f"pago_telefono_{apartamento}",
     )
 

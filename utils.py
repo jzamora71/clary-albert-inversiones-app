@@ -326,24 +326,68 @@ def build_pdf(
             pdf.cell(29 if has_depositado else 34, 8, money_pdf(row["Balance del Mes"]), border=1, ln=True)
 
     if anio_ytd is not None:
-        pdf.ln(8)
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 8, sanitize_text(f"Estado de Resultados (Ano {anio_ytd} hasta la fecha)"), ln=True)
+        pdf.ln(10)
 
+        label_w = 130
+        amount_w = 50
+        row_h = 8
+        teal = (1, 105, 111)
+        light_fill = (247, 246, 242)
+        gray_line = (190, 188, 182)
+
+        # --- Titulo con banda de color ---------------------------------
+        pdf.set_fill_color(*teal)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(
+            label_w + amount_w,
+            10,
+            sanitize_text(f"  Estado de Resultados (Ano {anio_ytd} hasta la fecha)"),
+            fill=True,
+            ln=True,
+        )
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+        # --- Ingresos ---------------------------------------------------
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(label_w, row_h, "  Ingresos por alquiler", border=0)
         pdf.set_font("Helvetica", "", 11)
-        pdf.cell(0, 7, sanitize_text(f"Ingresos por alquiler: {money_pdf(total_ingresos)}"), ln=True)
-        pdf.ln(1)
-        pdf.cell(0, 7, "Gastos:", ln=True)
+        pdf.cell(amount_w, row_h, money_pdf(total_ingresos), border=0, align="R", ln=True)
+        pdf.ln(3)
+
+        # --- Gastos -------------------------------------------------------
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(label_w + amount_w, row_h, "  Gastos", ln=True)
+        pdf.set_font("Helvetica", "", 11)
         if total_gerente is not None:
             etiqueta_gerente = f"Pago a {manager_name}" if manager_name else "Pago al gerente"
-            pdf.cell(0, 7, sanitize_text(f"   {etiqueta_gerente}: {money_pdf(total_gerente)}"), ln=True)
+            pdf.cell(label_w, row_h, sanitize_text(f"     {etiqueta_gerente}"), border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_gerente), border=0, align="R", ln=True)
         if total_otros is not None:
-            pdf.cell(0, 7, sanitize_text(f"   Otros gastos: {money_pdf(total_otros)}"), ln=True)
+            pdf.cell(label_w, row_h, "     Otros gastos", border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_otros), border=0, align="R", ln=True)
+
+        y_line = pdf.get_y() + 1
+        pdf.set_draw_color(*gray_line)
+        pdf.line(10, y_line, 10 + label_w + amount_w, y_line)
+        pdf.ln(3)
+
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, sanitize_text(f"   Total de gastos: {money_pdf(total_gastos)}"), ln=True)
-        pdf.ln(1)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, sanitize_text(f"Utilidad neta: {money_pdf(neto)}"), ln=True)
+        pdf.cell(label_w, row_h, "  Total de gastos", border=0)
+        pdf.cell(amount_w, row_h, money_pdf(total_gastos), border=0, align="R", ln=True)
+        pdf.ln(4)
+
+        # --- Utilidad neta, destacada ------------------------------------
+        pdf.set_fill_color(*light_fill)
+        pdf.set_draw_color(*teal)
+        pdf.set_line_width(0.6)
+        pdf.set_text_color(*teal)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(label_w, 11, "  Utilidad neta", border="TB", fill=True)
+        pdf.cell(amount_w, 11, money_pdf(neto) + "  ", border="TB", fill=True, align="R", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_line_width(0.2)
 
     pdf_bytes = pdf.output(dest="S")
     if isinstance(pdf_bytes, bytearray):
