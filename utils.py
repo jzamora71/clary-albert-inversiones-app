@@ -6,11 +6,14 @@ formats money and builds PDFs the exact same way, and the session_state keys
 that hold the data are only ever created once.
 """
 
+import os
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 import streamlit as st
 from fpdf import FPDF
+
+LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo.jpg")
 
 MESES_ES = {
     1: "enero",
@@ -203,6 +206,9 @@ def build_pdf(
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
+    if os.path.exists(LOGO_PATH):
+        pdf.image(LOGO_PATH, x=163, y=8, w=34)
+
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, sanitize_text(f"Reporte Contable - {empresa}"), ln=True)
 
@@ -260,41 +266,6 @@ def build_pdf(
         pdf.cell(0, 8, "No hay pagos pendientes.", ln=True)
         pdf.set_font("Helvetica", "B", 11)
         pdf.cell(0, 8, sanitize_text(f"Total Pendiente por Pagar: {money_pdf(total_pendiente)}"), ln=True)
-
-    pdf.ln(6)
-
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, "Gastos", ln=True)
-
-    has_categoria = "Categoria" in gastos_df.columns
-
-    pdf.set_font("Helvetica", "B", 10)
-    if has_categoria:
-        pdf.cell(35, 8, "Tipo", border=1)
-        pdf.cell(60, 8, "Concepto", border=1)
-        pdf.cell(35, 8, "Fecha", border=1)
-        pdf.cell(40, 8, "Monto", border=1, ln=True)
-    else:
-        pdf.cell(95, 8, "Concepto", border=1)
-        pdf.cell(40, 8, "Fecha", border=1)
-        pdf.cell(45, 8, "Monto", border=1, ln=True)
-
-    pdf.set_font("Helvetica", "", 10)
-    for _, row in gastos_df.iterrows():
-        fecha_txt = fecha_dmy(row["Fecha"])
-        monto_txt = money_pdf(row["Monto"])
-        if has_categoria:
-            tipo_txt = sanitize_text(str(row["Categoria"]))[:20]
-            concepto = sanitize_text(str(row["Concepto"]))[:32]
-            pdf.cell(35, 8, tipo_txt, border=1)
-            pdf.cell(60, 8, concepto, border=1)
-            pdf.cell(35, 8, fecha_txt, border=1)
-            pdf.cell(40, 8, monto_txt, border=1, ln=True)
-        else:
-            concepto = sanitize_text(str(row["Concepto"]))[:45]
-            pdf.cell(95, 8, concepto, border=1)
-            pdf.cell(40, 8, fecha_txt, border=1)
-            pdf.cell(45, 8, monto_txt, border=1, ln=True)
 
     if resumen_mensual_df is not None and not resumen_mensual_df.empty:
         pdf.ln(6)
