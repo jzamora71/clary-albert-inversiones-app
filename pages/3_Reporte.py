@@ -324,17 +324,40 @@ pendientes_vista_df = (
 )
 total_pendiente_vista = float(pendientes_vista_df["Pendiente"].sum()) if not pendientes_vista_df.empty else 0.0
 
+# --- Totales "Ano hasta la fecha" para el Resumen del PDF ------------------
+# El Resumen del PDF muestra: (1) el total del mes actual/seleccionado como
+# dato informativo, y (2) los totales acumulados del ano en curso (ingresos,
+# gastos y balance), sin importar el mes elegido arriba en "Mes a mostrar".
+anio_ytd = fecha_reporte.year
+meses_ytd = [clave for clave in meses if clave.startswith(f"{anio_ytd}-")]
+ingreso_ytd = sum(float(ingresos_por_mes.get(clave, 0.0)) for clave in meses_ytd)
+depositado_ytd = sum(float(depositos_raw.get(clave, 0.0)) for clave in meses_ytd)
+gerente_manual_ytd = sum(float(gerente_manual_por_mes.get(clave, 0.0)) for clave in meses_ytd)
+otros_ytd = sum(float(otros_por_mes.get(clave, 0.0)) for clave in meses_ytd)
+gerente_ytd = depositado_ytd * db.PORCENTAJE_GERENTE + gerente_manual_ytd
+gastos_ytd = gerente_ytd + otros_ytd
+neto_ytd = ingreso_ytd - gastos_ytd
+
+# El mes del que se informa en la linea aparte: si se eligio "Todos los
+# meses" arriba, se usa el mes real de hoy; si no, el mes seleccionado.
+mes_periodo_key = mes_actual_key if ver_todos_los_meses else mes_vista
+total_ingresos_periodo = float(ingresos_por_mes.get(mes_periodo_key, 0.0))
+periodo_label = mes_label(mes_periodo_key)
+
 pdf_bytes = build_pdf(
     empresa=empresa,
     fecha_reporte=fecha_reporte,
     ingresos_df=ingresos_vista_df,
     gastos_df=gastos_vista_df,
-    total_ingresos=total_ingresos_vista,
-    total_gastos=total_gastos_vista,
-    neto=neto_vista,
+    total_ingresos=ingreso_ytd,
+    total_gastos=gastos_ytd,
+    neto=neto_ytd,
     resumen_mensual_df=resumen_mensual_completo,
     pendientes_df=pendientes_vista_df,
     total_pendiente=total_pendiente_vista,
+    total_ingresos_periodo=total_ingresos_periodo,
+    periodo_label=periodo_label,
+    anio_ytd=anio_ytd,
 )
 
 sufijo_archivo = "todos_los_meses" if ver_todos_los_meses else mes_vista

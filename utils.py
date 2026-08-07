@@ -192,6 +192,9 @@ def build_pdf(
     resumen_mensual_df=None,
     pendientes_df=None,
     total_pendiente=0.0,
+    total_ingresos_periodo=None,
+    periodo_label=None,
+    anio_ytd=None,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -208,9 +211,17 @@ def build_pdf(
     pdf.cell(0, 8, "Resumen", ln=True)
 
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 7, f"Total pagos de alquiler: {money_pdf(total_ingresos)}", ln=True)
-    pdf.cell(0, 7, f"Total gastos: {money_pdf(total_gastos)}", ln=True)
-    pdf.cell(0, 7, f"Balance neto: {money_pdf(neto)}", ln=True)
+    if periodo_label is not None and total_ingresos_periodo is not None:
+        pdf.cell(
+            0,
+            7,
+            sanitize_text(f"Total pagos de alquiler ({periodo_label}): {money_pdf(total_ingresos_periodo)}"),
+            ln=True,
+        )
+    etiqueta_ytd = f" (Ano {anio_ytd} hasta la fecha)" if anio_ytd is not None else ""
+    pdf.cell(0, 7, f"Total pagos de alquiler{etiqueta_ytd}: {money_pdf(total_ingresos)}", ln=True)
+    pdf.cell(0, 7, f"Total gastos{etiqueta_ytd}: {money_pdf(total_gastos)}", ln=True)
+    pdf.cell(0, 7, f"Balance neto{etiqueta_ytd}: {money_pdf(neto)}", ln=True)
     pdf.ln(6)
 
     pdf.set_font("Helvetica", "B", 13)
