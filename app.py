@@ -94,7 +94,7 @@ st.markdown(
 # --- Logo + welcome message ------------------------------------------------
 logo_col1, logo_col2 = st.columns(2)
 with logo_col1:
-    st.image("assets/logo.png", use_container_width=True)
+    st.image("assets/edificio.jpg", use_container_width=True)
 with logo_col2:
     st.image("assets/logo.jpg", use_container_width=True)
 
