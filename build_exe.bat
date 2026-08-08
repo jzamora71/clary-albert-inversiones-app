@@ -22,13 +22,21 @@ echo.
 echo Step 1 of 2: Installing required packages (this can take a few minutes)...
 echo.
 python -m pip install --upgrade pip
+if errorlevel 1 goto :pip_failed
+
 python -m pip install -r requirements.txt
+if errorlevel 1 goto :pip_failed
+
 python -m pip install -r requirements-desktop.txt
+if errorlevel 1 goto :pip_failed
 
 echo.
 echo Step 2 of 2: Building ClaryAlbertInversiones.exe (this can take a few minutes)...
 echo.
 streamlit-desktop-app build app.py --name "ClaryAlbertInversiones" --icon assets\app_icon.ico --pyinstaller-options --noconfirm --add-data "pages;pages" --add-data "assets;assets" --collect-all streamlit --copy-metadata streamlit
+if errorlevel 1 goto :build_failed
+
+if not exist "dist\ClaryAlbertInversiones\ClaryAlbertInversiones.exe" goto :build_failed
 
 echo.
 echo ============================================================
@@ -39,3 +47,26 @@ echo  Double-click ClaryAlbertInversiones.exe inside it to run.
 echo ============================================================
 echo.
 pause
+goto :eof
+
+:pip_failed
+echo.
+echo ============================================================
+echo  SOMETHING WENT WRONG installing packages (see the red text
+echo  above this box). The app was NOT built. Take a screenshot
+echo  of this whole window and send it back for help.
+echo ============================================================
+echo.
+pause
+goto :eof
+
+:build_failed
+echo.
+echo ============================================================
+echo  SOMETHING WENT WRONG building the app (see the text above
+echo  this box). The app was NOT built successfully. Take a
+echo  screenshot of this whole window and send it back for help.
+echo ============================================================
+echo.
+pause
+goto :eof
