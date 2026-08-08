@@ -44,6 +44,15 @@ with col3:
 with col4:
     gasto_concepto = st.text_input("Descripcion de gastos", key="gasto_concepto")
 
+if gasto_categoria == db.TIPO_NOMINA:
+    st.caption(
+        f"⚠️ El pago a {db.MANAGER_NAME} ya se calcula automaticamente en la "
+        "pagina Reporte (segun el deposito bancario del mes) y se incluye "
+        "solo alli en el reporte. No lo agregues aqui tambien, o se "
+        f"contaria dos veces. Usa esta opcion de 'Nómina' unicamente para "
+        f"otros pagos de nomina distintos al de {db.MANAGER_NAME}."
+    )
+
 if st.button("Agregar gastos", type="primary"):
     if not gasto_concepto.strip():
         st.error("Escribe una descripcion de gastos.")
