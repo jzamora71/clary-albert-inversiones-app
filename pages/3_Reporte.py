@@ -55,6 +55,7 @@ fecha_reporte = st.date_input("Fecha del reporte (dia/mes/año)", value=date.tod
 # --- Load everything needed for the totals and the monthly summary --------
 pagos_raw = db.get_pagos_alquiler()
 gastos_raw = db.get_gastos()
+otros_ingresos_raw = db.get_otros_ingresos()
 depositos_raw = {row["mes"]: float(row["monto"]) for row in db.get_depositos()}
 
 ingresos_df = (
@@ -77,6 +78,13 @@ gastos_df = (
     )
     if gastos_raw
     else pd.DataFrame(columns=["Categoria", "Concepto", "Fecha", "Monto"])
+)
+otros_ingresos_df = (
+    pd.DataFrame(otros_ingresos_raw)[["concepto", "fecha", "monto"]].rename(
+        columns={"concepto": "Concepto", "fecha": "Fecha", "monto": "Monto"}
+    )
+    if otros_ingresos_raw
+    else pd.DataFrame(columns=["Concepto", "Fecha", "Monto"])
 )
 
 # --- Group everything by month ---------------------------------------------
@@ -336,7 +344,20 @@ gerente_manual_ytd = sum(float(gerente_manual_por_mes.get(clave, 0.0)) for clave
 otros_ytd = sum(float(otros_por_mes.get(clave, 0.0)) for clave in meses_ytd)
 gerente_ytd = depositado_ytd * db.PORCENTAJE_GERENTE + gerente_manual_ytd
 gastos_ytd = gerente_ytd + otros_ytd
-neto_ytd = ingreso_ytd - gastos_ytd
+
+# "Otros ingresos" (cualquier ingreso que no sea alquiler) del ano en curso,
+# para el Estado de Resultados del PDF. Se suma al balance neto para que
+# 'Total de ingresos' y 'Utilidad neta' del reporte cuadren correctamente.
+otros_ingresos_ytd_df = (
+    otros_ingresos_df[otros_ingresos_df["Fecha"].apply(mes_key).isin(meses_ytd)]
+    if not otros_ingresos_df.empty
+    else otros_ingresos_df
+)
+otros_ingresos_ytd = (
+    float(otros_ingresos_ytd_df["Monto"].sum()) if not otros_ingresos_ytd_df.empty else 0.0
+)
+
+neto_ytd = ingreso_ytd + otros_ingresos_ytd - gastos_ytd
 
 # --- Desglose de gastos YTD por categoria, para el Estado de Resultados ---
 # "otros_ytd" ya excluye el pago al gerente; lo que sobra despues de restar
@@ -382,7 +403,7 @@ pdf_bytes = build_pdf(
     total_gerente=gerente_ytd,
     total_otros=otros_ytd,
     manager_name=db.MANAGER_NAME,
-    total_otros_ingresos=0.0,
+    total_otros_ingresos=otros_ingresos_ytd,
     total_nomina=nomina_ytd,
     total_admin=admin_ytd,
     total_electricidad=electricidad_ytd,

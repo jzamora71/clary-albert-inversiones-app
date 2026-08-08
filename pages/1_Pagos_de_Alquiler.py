@@ -25,6 +25,7 @@ from utils import (
     build_pagos_pdf,
     fecha_dmy,
     init_session_state,
+    kpi_card,
     mes_key,
     mes_label,
     money,
@@ -265,4 +266,81 @@ if pagos:
         st.info(f"No hay pagos de alquiler registrados en {titulo_vista_pagos}.")
 else:
     st.info("Aun no hay pagos de alquiler registrados.")
+
+st.divider()
+
+# --- Otros ingresos (cualquier entrada de dinero que no sea alquiler) ------
+st.subheader("Otros ingresos")
+st.caption(
+    "Usa esta seccion para registrar cualquier ingreso que no sea un pago "
+    "de alquiler (por ejemplo, un reembolso, la venta de algo, etc.). Estos "
+    "montos se suman aparte y aparecen como 'Otros ingresos' en el Reporte "
+    "y en el Estado de Resultados del PDF, sin mezclarse con el alquiler."
+)
+
+col_oi1, col_oi2, col_oi3 = st.columns(3)
+with col_oi1:
+    otro_ingreso_fecha = st.date_input(
+        "Fecha (dia/mes/año)", value=date.today(), key="otro_ingreso_fecha"
+    )
+with col_oi2:
+    otro_ingreso_monto = money_input("Monto", key="otro_ingreso_monto")
+with col_oi3:
+    otro_ingreso_concepto = st.text_input("Descripcion", key="otro_ingreso_concepto")
+
+if st.button("Agregar otro ingreso", type="primary"):
+    if not otro_ingreso_concepto.strip():
+        st.error("Escribe una descripcion del ingreso.")
+    elif otro_ingreso_monto <= 0:
+        st.error("El monto debe ser mayor que cero.")
+    else:
+        db.add_otro_ingreso(
+            otro_ingreso_concepto.strip(), otro_ingreso_fecha.isoformat(), float(otro_ingreso_monto)
+        )
+        st.success("Otro ingreso registrado y guardado.")
+        del st.session_state["otro_ingreso_concepto"]
+        del st.session_state["otro_ingreso_monto"]
+        st.rerun()
+
+otros_ingresos = db.get_otros_ingresos()
+if otros_ingresos:
+    otros_ingresos_df = pd.DataFrame(otros_ingresos)[["id", "concepto", "fecha", "monto"]]
+    otros_ingresos_df.columns = ["ID", "Concepto", "Fecha", "Monto"]
+
+    st.caption("Toca el icono 🗑️ junto a un ingreso para eliminarlo (por ejemplo, si tiene un error).")
+
+    header_cols_oi = st.columns([2.2, 1.2, 1.3, 0.7])
+    for col, label in zip(header_cols_oi, ["Concepto", "Fecha", "Monto", ""]):
+        col.markdown(f"**{label}**")
+
+    for r in otros_ingresos_df.itertuples():
+        row_id = r.ID
+        with st.container(border=True):
+            row_cols = st.columns([2.2, 1.2, 1.3, 0.7])
+            row_cols[0].write(r.Concepto)
+            row_cols[1].write(fecha_dmy(r.Fecha))
+            row_cols[2].write(money(r.Monto))
+            if row_cols[3].button("🗑️", key=f"borrar_otro_ingreso_{row_id}", help="Eliminar este ingreso"):
+                st.session_state["confirmar_borrar_otro_ingreso_id"] = row_id
+                st.rerun()
+
+            if st.session_state.get("confirmar_borrar_otro_ingreso_id") == row_id:
+                st.warning(
+                    f"¿Seguro que deseas eliminar el ingreso **{r.Concepto}** "
+                    f"por **{money(r.Monto)}** del {fecha_dmy(r.Fecha)}? "
+                    "Esta accion no se puede deshacer."
+                )
+                confirm_cols = st.columns(2)
+                if confirm_cols[0].button("Si, eliminar", key=f"si_otro_ingreso_{row_id}", type="primary"):
+                    db.delete_ingreso(row_id)
+                    st.session_state.pop("confirmar_borrar_otro_ingreso_id", None)
+                    st.success("Ingreso eliminado.")
+                    st.rerun()
+                if confirm_cols[1].button("Cancelar", key=f"no_otro_ingreso_{row_id}"):
+                    st.session_state.pop("confirmar_borrar_otro_ingreso_id", None)
+                    st.rerun()
+
+    kpi_card("Total Otros Ingresos", money(otros_ingresos_df["Monto"].sum()))
+else:
+    st.info("Aun no hay otros ingresos registrados.")
 

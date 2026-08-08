@@ -49,6 +49,15 @@ TIPO_ELECTRICIDAD = "Electricidad"
 TIPO_OTRO_GASTO = "Reparaciones y otros gastos"
 TIPOS_GASTO = [TIPO_NOMINA, TIPO_ADMIN, TIPO_ELECTRICIDAD, TIPO_OTRO_GASTO]
 
+# Every row in "ingresos" is tagged with tipo_ingreso so rent payments and
+# "Otros ingresos" (any other income that isn't rent -- a refund, a one-time
+# sale, etc.) can share the same table without mixing into each other's
+# totals. Existing rows saved before this column existed have tipo_ingreso
+# = NULL; they are always treated as rent (see COALESCE usage below) so no
+# historical rent total silently changes because of this update.
+TIPO_INGRESO_ALQUILER = "alquiler"
+TIPO_INGRESO_OTRO = "otro"
+
 # The building manager is paid a fixed commission of whatever gets
 # deposited into the bank account each month.
 MANAGER_NAME = "Rafael Guerrero"
@@ -119,6 +128,7 @@ def init_db():
         _add_column_if_missing(s, "ingresos", "apartamento", "INTEGER")
         _add_column_if_missing(s, "ingresos", "telefono", "TEXT")
         _add_column_if_missing(s, "ingresos", "pendiente", "REAL")
+        _add_column_if_missing(s, "ingresos", "tipo_ingreso", "TEXT")
         _add_column_if_missing(s, "gastos", "categoria", "TEXT")
 
     # Make sure all 13 apartments exist in the tenant directory so the
@@ -242,10 +252,18 @@ def add_pago_alquiler(apartamento, nombre, telefono, fecha, monto, pendiente=0.0
     with conn.session as s:
         s.execute(
             text(
-                "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono, pendiente) "
-                "VALUES (:c, :f, :m, :a, :t, :p)"
+                "INSERT INTO ingresos (concepto, fecha, monto, apartamento, telefono, pendiente, tipo_ingreso) "
+                "VALUES (:c, :f, :m, :a, :t, :p, :ti)"
             ),
-            {"c": nombre, "f": fecha, "m": monto, "a": apartamento, "t": telefono, "p": pendiente or 0.0},
+            {
+                "c": nombre,
+                "f": fecha,
+                "m": monto,
+                "a": apartamento,
+                "t": telefono,
+                "p": pendiente or 0.0,
+                "ti": TIPO_INGRESO_ALQUILER,
+            },
         )
         s.commit()
     # Keep the tenant directory in sync so next month's form is pre-filled.
@@ -258,6 +276,23 @@ def add_ingreso(concepto, fecha, monto):
         s.execute(
             text("INSERT INTO ingresos (concepto, fecha, monto) VALUES (:c, :f, :m)"),
             {"c": concepto, "f": fecha, "m": monto},
+        )
+        s.commit()
+
+
+def add_otro_ingreso(concepto, fecha, monto):
+    """Register a non-rent income entry (a refund, a one-time sale, etc.).
+    Saved in the same 'ingresos' table as rent payments, but tagged with
+    tipo_ingreso='otro' and no apartment/tenant info, so it never mixes
+    into the rent-only totals used across the rest of the app."""
+    conn = get_conn()
+    with conn.session as s:
+        s.execute(
+            text(
+                "INSERT INTO ingresos (concepto, fecha, monto, tipo_ingreso) "
+                "VALUES (:c, :f, :m, :ti)"
+            ),
+            {"c": concepto, "f": fecha, "m": monto, "ti": TIPO_INGRESO_OTRO},
         )
         s.commit()
 
@@ -275,18 +310,36 @@ def add_gasto(concepto, fecha, monto, categoria=TIPO_OTRO_GASTO):
 def get_ingresos():
     conn = get_conn()
     df = conn.query(
-        "SELECT id, concepto, fecha, monto FROM ingresos ORDER BY fecha, id", ttl=0
+        f"SELECT id, concepto, fecha, monto FROM ingresos "
+        f"WHERE COALESCE(tipo_ingreso, '{TIPO_INGRESO_ALQUILER}') = '{TIPO_INGRESO_ALQUILER}' "
+        f"ORDER BY fecha, id",
+        ttl=0,
     )
     return df.to_dict("records")
 
 
 def get_pagos_alquiler():
-    """Rent payments with apartment number and contact number included."""
+    """Rent payments with apartment number and contact number included.
+    Rows saved before tipo_ingreso existed (NULL) are treated as rent too,
+    so no historical total changes because of the 'Otros ingresos' feature.
+    """
     conn = get_conn()
     df = conn.query(
-        "SELECT id, apartamento, concepto AS nombre, telefono, fecha, monto, "
-        "COALESCE(pendiente, 0) AS pendiente "
-        "FROM ingresos ORDER BY fecha DESC, id DESC",
+        f"SELECT id, apartamento, concepto AS nombre, telefono, fecha, monto, "
+        f"COALESCE(pendiente, 0) AS pendiente "
+        f"FROM ingresos WHERE COALESCE(tipo_ingreso, '{TIPO_INGRESO_ALQUILER}') = '{TIPO_INGRESO_ALQUILER}' "
+        f"ORDER BY fecha DESC, id DESC",
+        ttl=0,
+    )
+    return df.to_dict("records")
+
+
+def get_otros_ingresos():
+    """Non-rent income entries only (tipo_ingreso='otro')."""
+    conn = get_conn()
+    df = conn.query(
+        f"SELECT id, concepto, fecha, monto FROM ingresos "
+        f"WHERE tipo_ingreso = '{TIPO_INGRESO_OTRO}' ORDER BY fecha DESC, id DESC",
         ttl=0,
     )
     return df.to_dict("records")
