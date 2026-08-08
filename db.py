@@ -35,13 +35,19 @@ NUM_APARTAMENTOS = 13
 
 # Expense categories. "Pago del gerente" is kept as a label for backward
 # compatibility with any expense rows entered manually before the
-# automatic commission below existed. Going forward the Gastos page only
-# lets you pick "Otro gasto" -- the manager's pay is calculated
+# automatic commission below existed -- the manager's pay is calculated
 # automatically (see MANAGER_NAME / PORCENTAJE_GERENTE) from the monthly
-# bank deposit instead of being typed in as a plain expense.
+# bank deposit instead of being typed in as a plain expense. The Gastos
+# page lets the user pick one of the four categories below for every
+# other expense; TIPO_OTRO_GASTO also acts as the catch-all bucket for any
+# expense rows saved before these categories existed (old "Otros gastos"
+# rows still show up correctly grouped under it in the income statement).
 TIPO_PAGO_GERENTE = "Pago del gerente"
-TIPO_OTRO_GASTO = "Otros gastos"
-TIPOS_GASTO = [TIPO_OTRO_GASTO]
+TIPO_NOMINA = "Nómina"
+TIPO_ADMIN = "Gastos administrativos"
+TIPO_ELECTRICIDAD = "Electricidad"
+TIPO_OTRO_GASTO = "Reparaciones y otros gastos"
+TIPOS_GASTO = [TIPO_NOMINA, TIPO_ADMIN, TIPO_ELECTRICIDAD, TIPO_OTRO_GASTO]
 
 # The building manager is paid a fixed commission of whatever gets
 # deposited into the bank account each month.

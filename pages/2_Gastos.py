@@ -34,13 +34,15 @@ st.caption(f"{COMPANY_NAME} - Registro de gastos (guardado permanentemente)")
 
 st.subheader("Agregar gastos")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
-    gasto_concepto = st.text_input("Descripcion de gastos", key="gasto_concepto")
+    gasto_fecha = st.date_input("Fecha (dia/mes/año)", value=date.today(), key="gasto_fecha")
 with col2:
-    gasto_monto = money_input("Monto de gastos", key="gasto_monto")
+    gasto_categoria = st.selectbox("Tipo de gasto", options=db.TIPOS_GASTO, key="gasto_categoria")
 with col3:
-    gasto_fecha = st.date_input("Fecha de gastos (dia/mes/año)", value=date.today(), key="gasto_fecha")
+    gasto_monto = money_input("Monto de gastos", key="gasto_monto")
+with col4:
+    gasto_concepto = st.text_input("Descripcion de gastos", key="gasto_concepto")
 
 if st.button("Agregar gastos", type="primary"):
     if not gasto_concepto.strip():
@@ -48,7 +50,7 @@ if st.button("Agregar gastos", type="primary"):
     elif gasto_monto <= 0:
         st.error("El monto debe ser mayor que cero.")
     else:
-        db.add_gasto(gasto_concepto.strip(), gasto_fecha.isoformat(), float(gasto_monto), categoria=db.TIPO_OTRO_GASTO)
+        db.add_gasto(gasto_concepto.strip(), gasto_fecha.isoformat(), float(gasto_monto), categoria=gasto_categoria)
         st.success("Gastos registrados y guardados.")
         # Limpiar la descripcion y el monto para que el siguiente gasto
         # empiece en blanco, en vez de mostrar los datos del anterior.
@@ -98,6 +100,6 @@ if gastos:
                     st.session_state.pop("confirmar_borrar_gasto_id", None)
                     st.rerun()
 
-    kpi_card("Total gastos", money(gastos_df["Monto"].sum()), expense=True)
+    kpi_card("Total Gastos", money(gastos_df["Monto"].sum()), expense=True)
 else:
     st.info("Aun no hay gastos registrados.")

@@ -30,7 +30,7 @@ MESES_ES = {
     12: "diciembre",
 }
 
-COMPANY_NAME = "Clary & Albert Inversiones"
+COMPANY_NAME = "Administración de Propiedades y Finanzas"
 
 
 def init_session_state():
@@ -72,10 +72,10 @@ def mes_key(fecha_valor):
 
 
 def mes_label(year_month_key):
-    """Turn a 'YYYY-MM' key into a Spanish label, e.g. '2026-08' -> 'agosto 2026'."""
+    """Turn a 'YYYY-MM' key into a Spanish label, e.g. '2026-08' -> 'Agosto 2026'."""
     try:
         year_str, month_str = year_month_key.split("-")
-        return f"{MESES_ES[int(month_str)]} {year_str}"
+        return f"{MESES_ES[int(month_str)].capitalize()} {year_str}"
     except (ValueError, KeyError):
         return year_month_key
 
@@ -201,6 +201,11 @@ def build_pdf(
     total_gerente=None,
     total_otros=None,
     manager_name="",
+    total_otros_ingresos=0.0,
+    total_nomina=None,
+    total_admin=None,
+    total_electricidad=None,
+    total_reparaciones=None,
 ):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -210,7 +215,7 @@ def build_pdf(
         pdf.image(LOGO_PATH, x=163, y=8, w=34)
 
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, sanitize_text(f"Reporte Contable - {empresa}"), ln=True)
+    pdf.cell(0, 10, "Registro Contable", ln=True)
 
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 8, sanitize_text(f"Fecha del reporte: {fecha_es_larga(fecha_reporte)}"), ln=True)
@@ -224,13 +229,13 @@ def build_pdf(
         pdf.cell(
             0,
             7,
-            sanitize_text(f"Total pagos de alquiler ({periodo_label}): {money_pdf(total_ingresos_periodo)}"),
+            sanitize_text(f"Total Pagos de Alquiler ({periodo_label}): {money_pdf(total_ingresos_periodo)}"),
             ln=True,
         )
     etiqueta_ytd = f" (A\u00f1o {anio_ytd} hasta la fecha)" if anio_ytd is not None else ""
-    pdf.cell(0, 7, f"Total pagos de alquiler{etiqueta_ytd}: {money_pdf(total_ingresos)}", ln=True)
-    pdf.cell(0, 7, f"Total gastos{etiqueta_ytd}: {money_pdf(total_gastos)}", ln=True)
-    pdf.cell(0, 7, f"Balance neto{etiqueta_ytd}: {money_pdf(neto)}", ln=True)
+    pdf.cell(0, 7, f"Total Pagos de Alquiler{etiqueta_ytd}: {money_pdf(total_ingresos)}", ln=True)
+    pdf.cell(0, 7, f"Total Gastos{etiqueta_ytd}: {money_pdf(total_gastos)}", ln=True)
+    pdf.cell(0, 7, f"Balance Neto{etiqueta_ytd}: {money_pdf(neto)}", ln=True)
     pdf.ln(6)
 
     pdf.set_font("Helvetica", "B", 13)
@@ -322,10 +327,22 @@ def build_pdf(
 
         # --- Ingresos ---------------------------------------------------
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(label_w, row_h, "  Ingresos por alquiler", border=0)
+        pdf.cell(label_w + amount_w, row_h, "  Ingresos", ln=True)
         pdf.set_font("Helvetica", "", 11)
+        pdf.cell(label_w, row_h, "     Ingresos por alquiler", border=0)
         pdf.cell(amount_w, row_h, money_pdf(total_ingresos), border=0, align="R", ln=True)
+        pdf.cell(label_w, row_h, "     Otros ingresos", border=0)
+        pdf.cell(amount_w, row_h, money_pdf(total_otros_ingresos), border=0, align="R", ln=True)
+
+        y_line_ingresos = pdf.get_y() + 1
+        pdf.set_draw_color(*gray_line)
+        pdf.line(10, y_line_ingresos, 10 + label_w + amount_w, y_line_ingresos)
         pdf.ln(3)
+
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(label_w, row_h, "  Total de ingresos", border=0)
+        pdf.cell(amount_w, row_h, money_pdf(total_ingresos + total_otros_ingresos), border=0, align="R", ln=True)
+        pdf.ln(4)
 
         # --- Gastos -------------------------------------------------------
         pdf.set_font("Helvetica", "B", 11)
@@ -335,8 +352,20 @@ def build_pdf(
             etiqueta_gerente = f"Pago a {manager_name}" if manager_name else "Pago al gerente"
             pdf.cell(label_w, row_h, sanitize_text(f"     {etiqueta_gerente}"), border=0)
             pdf.cell(amount_w, row_h, money_pdf(total_gerente), border=0, align="R", ln=True)
-        if total_otros is not None:
-            pdf.cell(label_w, row_h, "     Otros gastos", border=0)
+        if total_nomina is not None:
+            pdf.cell(label_w, row_h, "     N\u00f3mina", border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_nomina), border=0, align="R", ln=True)
+        if total_admin is not None:
+            pdf.cell(label_w, row_h, "     Gastos administrativos", border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_admin), border=0, align="R", ln=True)
+        if total_electricidad is not None:
+            pdf.cell(label_w, row_h, "     Electricidad", border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_electricidad), border=0, align="R", ln=True)
+        if total_reparaciones is not None:
+            pdf.cell(label_w, row_h, "     Reparaciones y otros gastos", border=0)
+            pdf.cell(amount_w, row_h, money_pdf(total_reparaciones), border=0, align="R", ln=True)
+        elif total_otros is not None:
+            pdf.cell(label_w, row_h, "     Reparaciones y otros gastos", border=0)
             pdf.cell(amount_w, row_h, money_pdf(total_otros), border=0, align="R", ln=True)
 
         y_line = pdf.get_y() + 1

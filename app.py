@@ -92,9 +92,11 @@ st.markdown(
 )
 
 # --- Logo + welcome message ------------------------------------------------
-logo_col1, logo_col2, logo_col3 = st.columns([1, 2, 1])
+logo_col1, logo_col2 = st.columns(2)
+with logo_col1:
+    st.image("assets/logo.png", use_container_width=True)
 with logo_col2:
-    st.image("assets/logo.png", width=260)
+    st.image("assets/logo.jpg", use_container_width=True)
 
 st.markdown(
     f"""
@@ -109,7 +111,7 @@ st.markdown(
 st.markdown(
     """
     <p style="text-align:center; color:#475569; font-size:16px; max-width:520px; margin:0 auto 24px auto;">
-        Bienvenido. Desde aqui puedes registrar los pagos de alquiler de los
+        Bienvenidos. Desde aqui puedes registrar los pagos de alquiler de los
         13 apartamentos, registrar gastos y generar el reporte contable en
         PDF. Usa los botones abajo o el menu de la izquierda para navegar.
     </p>
@@ -123,9 +125,9 @@ total_gastos = sum(item["monto"] for item in db.get_gastos())
 neto = total_ingresos - total_gastos
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Pagos de alquiler totales", money(total_ingresos))
-c2.metric("Gastos totales", money(total_gastos))
-c3.metric("Balance neto", money(neto))
+c1.metric("Pagos de Alquiler Totales", money(total_ingresos))
+c2.metric("Gastos Totales", money(total_gastos))
+c3.metric("Balance Neto", money(neto))
 
 st.divider()
 

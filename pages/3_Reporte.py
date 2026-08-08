@@ -203,11 +203,11 @@ else:
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    kpi_card(f"Total pagos de alquiler ({titulo_vista})", money(total_ingresos_vista))
+    kpi_card(f"Total Pagos de Alquiler ({titulo_vista})", money(total_ingresos_vista))
 with c2:
-    kpi_card(f"Total gastos ({titulo_vista})", money(total_gastos_vista), expense=True)
+    kpi_card(f"Total Gastos ({titulo_vista})", money(total_gastos_vista), expense=True)
 with c3:
-    kpi_card(f"Balance neto ({titulo_vista})", money(neto_vista))
+    kpi_card(f"Balance Neto ({titulo_vista})", money(neto_vista))
 
 c4, c5 = st.columns(2)
 with c4:
@@ -338,6 +338,27 @@ gerente_ytd = depositado_ytd * db.PORCENTAJE_GERENTE + gerente_manual_ytd
 gastos_ytd = gerente_ytd + otros_ytd
 neto_ytd = ingreso_ytd - gastos_ytd
 
+# --- Desglose de gastos YTD por categoria, para el Estado de Resultados ---
+# "otros_ytd" ya excluye el pago al gerente; lo que sobra despues de restar
+# Nomina/Administrativos/Electricidad cae en "Reparaciones y otros gastos",
+# lo que tambien incluye cualquier gasto antiguo guardado antes de que
+# existieran estas categorias.
+gastos_ytd_df = (
+    gastos_df[gastos_df["Fecha"].apply(mes_key).isin(meses_ytd)] if not gastos_df.empty else gastos_df
+)
+nomina_ytd = (
+    gastos_ytd_df.loc[gastos_ytd_df["Categoria"] == db.TIPO_NOMINA, "Monto"].sum() if not gastos_ytd_df.empty else 0.0
+)
+admin_ytd = (
+    gastos_ytd_df.loc[gastos_ytd_df["Categoria"] == db.TIPO_ADMIN, "Monto"].sum() if not gastos_ytd_df.empty else 0.0
+)
+electricidad_ytd = (
+    gastos_ytd_df.loc[gastos_ytd_df["Categoria"] == db.TIPO_ELECTRICIDAD, "Monto"].sum()
+    if not gastos_ytd_df.empty
+    else 0.0
+)
+reparaciones_ytd = otros_ytd - nomina_ytd - admin_ytd - electricidad_ytd
+
 # El mes del que se informa en la linea aparte: si se eligio "Todos los
 # meses" arriba, se usa el mes real de hoy; si no, el mes seleccionado.
 mes_periodo_key = mes_actual_key if ver_todos_los_meses else mes_vista
@@ -361,6 +382,11 @@ pdf_bytes = build_pdf(
     total_gerente=gerente_ytd,
     total_otros=otros_ytd,
     manager_name=db.MANAGER_NAME,
+    total_otros_ingresos=0.0,
+    total_nomina=nomina_ytd,
+    total_admin=admin_ytd,
+    total_electricidad=electricidad_ytd,
+    total_reparaciones=reparaciones_ytd,
 )
 
 sufijo_archivo = "todos_los_meses" if ver_todos_los_meses else mes_vista
