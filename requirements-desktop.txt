@@ -1,0 +1,5 @@
+# Extra packages needed ONLY to build the standalone Windows .exe.
+# The live web app (Streamlit Community Cloud) does not need these --
+# keep them in a separate file so the web deploy stays fast and lean.
+streamlit-desktop-app>=0.5
+pyinstaller

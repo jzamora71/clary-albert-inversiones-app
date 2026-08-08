@@ -12,7 +12,7 @@ opening this landing page.
 import streamlit as st
 
 import db
-from utils import COMPANY_NAME, init_session_state, money
+from utils import COMPANY_NAME, EDIFICIO_PATH, LOGO_PATH, init_session_state, money
 
 st.set_page_config(
     page_title=f"{COMPANY_NAME} - Contabilidad",
@@ -94,9 +94,9 @@ st.markdown(
 # --- Logo + welcome message ------------------------------------------------
 logo_col1, logo_col2 = st.columns(2)
 with logo_col1:
-    st.image("assets/edificio.jpg", use_container_width=True)
+    st.image(EDIFICIO_PATH, use_container_width=True)
 with logo_col2:
-    st.image("assets/logo.jpg", use_container_width=True)
+    st.image(LOGO_PATH, use_container_width=True)
 
 st.markdown(
     f"""

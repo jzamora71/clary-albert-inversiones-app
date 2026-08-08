@@ -204,6 +204,52 @@ regardless of which storage mode is active:
   upload your most recent backup CSV in that same section to bring the
   data back.
 
+## Building a standalone Windows .exe (optional, for personal/offline use)
+
+This project can also be packaged into a standalone Windows desktop app
+that runs without a browser or an internet connection, using the
+`streamlit-desktop-app` + PyInstaller tools. This is separate from the
+live web app at streamlit.app -- it is meant for a personal, offline
+copy with its own local database, not for sharing real tenant/financial
+data publicly.
+
+**Requirements on the Windows PC that builds it:** Python 3.10-3.13
+installed from python.org, with "Add python.exe to PATH" checked during
+install.
+
+**Steps:**
+
+1. Open PowerShell and go to the project folder, e.g.:
+   ```
+   cd C:\Users\jzamo\OneDrive\Desktop\clary-albert-inversiones-app
+   ```
+2. Make sure you have the latest code: `git pull`
+3. Double-click `build_exe.bat` in File Explorer (or run `.\build_exe.bat`
+   from PowerShell). It installs the extra build-only packages listed in
+   `requirements-desktop.txt` and then runs the PyInstaller build. This
+   takes a few minutes.
+4. When it finishes, look inside the new `dist\ClaryAlbertInversiones\`
+   folder. It contains `ClaryAlbertInversiones.exe` plus supporting
+   files it needs sitting right next to it.
+5. To share it: right-click the `dist\ClaryAlbertInversiones` folder ->
+   "Send to" -> "Compressed (zipped) folder", then share that .zip.
+   Whoever receives it should extract the whole folder before running
+   the .exe inside it -- the .exe will not work on its own, separated
+   from its folder.
+
+**Where its data is stored:** this desktop build always uses its own
+local SQLite database at `%APPDATA%\ClaryAlbertInversiones\data.db` on
+whichever Windows PC runs it. That file persists across restarts (it is
+not deleted when the app closes), so it is safe to use for real personal
+record-keeping on that PC. It is completely separate from the live web
+app's data -- entries made in one will never appear in the other.
+
+**First-run security warning:** since this .exe is not digitally signed,
+Windows SmartScreen (or your antivirus) may show a warning like
+"Windows protected your PC" the first time it runs. Click "More info"
+then "Run anyway" to proceed -- this is expected for any unsigned
+homemade .exe, not a sign of a real problem.
+
 ## Notes
 
 - If you ever add a new report, create a new file inside `/pages`

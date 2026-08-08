@@ -24,12 +24,42 @@ is what keeps local development/testing working without needing Supabase
 credentials -- it is NOT persistent when deployed).
 """
 
+import os
+import sys
 from pathlib import Path
 
 import streamlit as st
 from sqlalchemy import text
 
-DB_PATH = Path(__file__).parent / "data.db"
+
+def _local_data_dir() -> Path:
+    """Pick a stable, writable folder for the local SQLite fallback file.
+
+    When this app is bundled into a standalone .exe (PyInstaller), the
+    script's own folder is a temporary extraction folder that gets wiped
+    and recreated on every launch -- storing data.db next to the script
+    would silently erase all data every time the app is closed and
+    reopened. Instead we always use a per-user folder outside of the
+    bundle: %APPDATA%/ClaryAlbertInversiones on Windows, or
+    ~/.clary_albert_inversiones on other systems. This folder is created
+    once and reused across every run, so data survives restarts.
+
+    This only affects the local SQLite fallback -- when Supabase secrets
+    are configured (the deployed web app), this path is never used.
+    """
+    if getattr(sys, "frozen", False):
+        # Running as a packaged .exe -- always use a stable per-user folder.
+        base = os.environ.get("APPDATA") or str(Path.home())
+        data_dir = Path(base) / "ClaryAlbertInversiones"
+    else:
+        # Running from source (local development/testing) -- keep the
+        # existing behavior of storing data.db next to the script.
+        data_dir = Path(__file__).parent
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+DB_PATH = _local_data_dir() / "data.db"
 CONNECTION_NAME = "supabase_db"
 NUM_APARTAMENTOS = 13
 

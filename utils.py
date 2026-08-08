@@ -7,13 +7,30 @@ that hold the data are only ever created once.
 """
 
 import os
+import sys
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 import streamlit as st
 from fpdf import FPDF
 
-LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo.jpg")
+
+def resource_path(*parts) -> str:
+    """Build an absolute path to a bundled file (image, logo, etc.).
+
+    Works both when running the app normally from source AND when it has
+    been packaged into a standalone .exe with PyInstaller. PyInstaller
+    extracts bundled data files into a temporary folder at runtime and
+    exposes that folder's path via sys._MEIPASS -- when that attribute is
+    missing we're running from source, so we fall back to the folder that
+    contains this file.
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, *parts)
+
+
+LOGO_PATH = resource_path("assets", "logo.jpg")
+EDIFICIO_PATH = resource_path("assets", "edificio.jpg")
 
 MESES_ES = {
     1: "enero",
