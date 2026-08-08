@@ -33,7 +33,7 @@ if errorlevel 1 goto :pip_failed
 echo.
 echo Step 2 of 2: Building ClaryAlbertInversiones.exe (this can take a few minutes)...
 echo.
-streamlit-desktop-app build app.py --name "ClaryAlbertInversiones" --icon assets\app_icon.ico --pyinstaller-options --noconfirm --add-data "pages;pages" --add-data "assets;assets" --collect-all streamlit --copy-metadata streamlit
+streamlit-desktop-app build app.py --name "ClaryAlbertInversiones" --icon assets\app_icon.ico --pyinstaller-options --noconfirm --add-data "pages;pages" --add-data "assets;assets" --add-data "utils.py;." --add-data "db.py;." --hidden-import utils --hidden-import db --collect-all streamlit --copy-metadata streamlit
 if errorlevel 1 goto :build_failed
 
 if not exist "dist\ClaryAlbertInversiones\ClaryAlbertInversiones.exe" goto :build_failed
