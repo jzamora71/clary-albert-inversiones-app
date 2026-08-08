@@ -58,10 +58,14 @@ TIPOS_GASTO = [TIPO_NOMINA, TIPO_ADMIN, TIPO_ELECTRICIDAD, TIPO_OTRO_GASTO]
 TIPO_INGRESO_ALQUILER = "alquiler"
 TIPO_INGRESO_OTRO = "otro"
 
-# The building manager is paid a fixed commission of whatever gets
-# deposited into the bank account each month.
+# The building manager is paid a commission of whatever gets deposited
+# into the bank account each month. PORCENTAJE_GERENTE below is only the
+# default used the very first time the app runs -- once someone saves a
+# new percentage from the Reporte page (see get/set_porcentaje_gerente),
+# that saved value is used instead, so it survives app restarts.
 MANAGER_NAME = "Rafael Guerrero"
 PORCENTAJE_GERENTE = 0.10
+CONFIG_PORCENTAJE_GERENTE = "porcentaje_gerente"
 
 
 def _has_supabase_secret():
@@ -118,6 +122,10 @@ def init_db():
         s.execute(text(
             "CREATE TABLE IF NOT EXISTS depositos ("
             "mes TEXT PRIMARY KEY, monto REAL NOT NULL DEFAULT 0)"
+        ))
+        s.execute(text(
+            "CREATE TABLE IF NOT EXISTS configuracion ("
+            "clave TEXT PRIMARY KEY, valor REAL NOT NULL)"
         ))
         s.commit()
 
@@ -235,6 +243,47 @@ def upsert_deposito(mes, monto):
                     "ON CONFLICT (mes) DO UPDATE SET monto = EXCLUDED.monto"
                 ),
                 {"m": mes, "v": monto},
+            )
+        s.commit()
+
+
+# --- Configuracion (porcentaje de pago automatico al gerente) -------------
+
+def get_porcentaje_gerente():
+    """Current percentage (as a decimal, e.g. 0.10 = 10%) used to calculate
+    the automatic manager commission from the monthly bank deposit. Falls
+    back to the PORCENTAJE_GERENTE default if nothing was saved yet."""
+    conn = get_conn()
+    df = conn.query(
+        f"SELECT valor FROM configuracion WHERE clave = '{CONFIG_PORCENTAJE_GERENTE}'",
+        ttl=0,
+    )
+    if df.empty:
+        return PORCENTAJE_GERENTE
+    return float(df.iloc[0]["valor"])
+
+
+def set_porcentaje_gerente(valor):
+    """Save a new percentage (decimal, e.g. 0.12 = 12%) for the automatic
+    manager commission calculation. Persists across restarts."""
+    conn = get_conn()
+    dialect = conn.engine.dialect.name
+    with conn.session as s:
+        if dialect == "sqlite":
+            s.execute(
+                text(
+                    "INSERT INTO configuracion (clave, valor) VALUES (:c, :v) "
+                    "ON CONFLICT(clave) DO UPDATE SET valor = :v"
+                ),
+                {"c": CONFIG_PORCENTAJE_GERENTE, "v": valor},
+            )
+        else:
+            s.execute(
+                text(
+                    "INSERT INTO configuracion (clave, valor) VALUES (:c, :v) "
+                    "ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor"
+                ),
+                {"c": CONFIG_PORCENTAJE_GERENTE, "v": valor},
             )
         s.commit()
 

@@ -43,6 +43,7 @@ st.set_page_config(page_title=f"Reporte - {COMPANY_NAME}", page_icon="📊", lay
 
 init_session_state()
 db.init_db()
+porcentaje_gerente = db.get_porcentaje_gerente()
 
 st.page_link("app.py", label="🏠 Volver al inicio", icon=None)
 
@@ -123,7 +124,7 @@ filas_resumen = []
 for clave in meses:
     ingreso_mes = float(ingresos_por_mes.get(clave, 0.0))
     depositado_mes = float(depositos_raw.get(clave, 0.0))
-    pago_gerente_mes = depositado_mes * db.PORCENTAJE_GERENTE + float(gerente_manual_por_mes.get(clave, 0.0))
+    pago_gerente_mes = depositado_mes * porcentaje_gerente + float(gerente_manual_por_mes.get(clave, 0.0))
     otros_mes = float(otros_por_mes.get(clave, 0.0))
     filas_resumen.append(
         {
@@ -198,7 +199,7 @@ else:
     )
     ingreso_mes_vista = float(ingresos_por_mes.get(mes_vista, 0.0))
     depositado_mes_vista = float(depositos_raw.get(mes_vista, 0.0))
-    gerente_mes_vista = depositado_mes_vista * db.PORCENTAJE_GERENTE + float(
+    gerente_mes_vista = depositado_mes_vista * porcentaje_gerente + float(
         gerente_manual_por_mes.get(mes_vista, 0.0)
     )
     otros_mes_vista = float(otros_por_mes.get(mes_vista, 0.0))
@@ -229,9 +230,28 @@ st.divider()
 st.subheader(f"Deposito bancario mensual y pago a {db.MANAGER_NAME}")
 st.caption(
     f"El pago de {db.MANAGER_NAME} se calcula automaticamente: "
-    f"{int(db.PORCENTAJE_GERENTE * 100)}% de lo que se deposito en el banco "
+    f"{porcentaje_gerente * 100:g}% de lo que se deposito en el banco "
     "ese mes. Registra aqui el monto depositado de cada mes."
 )
+
+with st.expander("⚙️ Ajustar el porcentaje de pago automatico"):
+    st.caption(
+        "Cambia aqui el porcentaje que se usa para calcular el pago "
+        f"automatico a {db.MANAGER_NAME} sobre el monto depositado. "
+        "El nuevo porcentaje aplica de inmediato a todos los meses."
+    )
+    nuevo_porcentaje = st.number_input(
+        "Porcentaje (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=float(porcentaje_gerente * 100),
+        step=0.5,
+        key="nuevo_porcentaje_gerente",
+    )
+    if st.button("Guardar porcentaje"):
+        db.set_porcentaje_gerente(nuevo_porcentaje / 100)
+        st.success(f"Porcentaje actualizado a {nuevo_porcentaje:g}%.")
+        st.rerun()
 
 meses_opciones = sorted(rango_meses(atras=12, adelante=2), reverse=True)
 mes_actual_key = mes_key(date.today().isoformat())
@@ -249,9 +269,9 @@ with col_dep2:
         default=float(depositos_raw.get(mes_seleccionado, 0.0)),
     )
 
-pago_gerente_preview = monto_deposito * db.PORCENTAJE_GERENTE
+pago_gerente_preview = monto_deposito * porcentaje_gerente
 kpi_card(
-    f"Pago a {db.MANAGER_NAME} ({int(db.PORCENTAJE_GERENTE * 100)}% de {mes_label(mes_seleccionado)})",
+    f"Pago a {db.MANAGER_NAME} ({porcentaje_gerente * 100:g}% de {mes_label(mes_seleccionado)})",
     money(pago_gerente_preview),
     expense=True,
 )
@@ -342,7 +362,7 @@ ingreso_ytd = sum(float(ingresos_por_mes.get(clave, 0.0)) for clave in meses_ytd
 depositado_ytd = sum(float(depositos_raw.get(clave, 0.0)) for clave in meses_ytd)
 gerente_manual_ytd = sum(float(gerente_manual_por_mes.get(clave, 0.0)) for clave in meses_ytd)
 otros_ytd = sum(float(otros_por_mes.get(clave, 0.0)) for clave in meses_ytd)
-gerente_ytd = depositado_ytd * db.PORCENTAJE_GERENTE + gerente_manual_ytd
+gerente_ytd = depositado_ytd * porcentaje_gerente + gerente_manual_ytd
 gastos_ytd = gerente_ytd + otros_ytd
 
 # "Otros ingresos" (cualquier ingreso que no sea alquiler) del ano en curso,
@@ -380,6 +400,12 @@ electricidad_ytd = (
 )
 reparaciones_ytd = otros_ytd - nomina_ytd - admin_ytd - electricidad_ytd
 
+# El pago automatico al gerente (comision sobre el deposito bancario) ya
+# no aparece como su propia linea en el Estado de Resultados del PDF --
+# se suma a Nomina, para que ese renglon quede mas corto y quepa en una
+# sola pagina.
+nomina_ytd_pdf = nomina_ytd + gerente_ytd
+
 # El mes del que se informa en la linea aparte: si se eligio "Todos los
 # meses" arriba, se usa el mes real de hoy; si no, el mes seleccionado.
 mes_periodo_key = mes_actual_key if ver_todos_los_meses else mes_vista
@@ -400,11 +426,9 @@ pdf_bytes = build_pdf(
     total_ingresos_periodo=total_ingresos_periodo,
     periodo_label=periodo_label,
     anio_ytd=anio_ytd,
-    total_gerente=gerente_ytd,
     total_otros=otros_ytd,
-    manager_name=db.MANAGER_NAME,
     total_otros_ingresos=otros_ingresos_ytd,
-    total_nomina=nomina_ytd,
+    total_nomina=nomina_ytd_pdf,
     total_admin=admin_ytd,
     total_electricidad=electricidad_ytd,
     total_reparaciones=reparaciones_ytd,
